@@ -34,7 +34,7 @@ function mcl_context(): array {
 		return $ctx;
 	}
 	$b    = mcl_settings();
-	$home = array( 'Home', home_url( '/' ) );
+	$home = array( __( 'Home', 'marccent-local' ), home_url( '/' ) );
 	$ctx  = array( 'post' => null, 'title' => '', 'description' => '', 'url' => '', 'image' => '', 'trail' => array( $home ), 'type' => 'WebPage' );
 
 	if ( is_post_type_archive( 'city' ) ) {

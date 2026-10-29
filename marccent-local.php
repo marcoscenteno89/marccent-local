@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Marccent Local
  * Description: A small local business on Marccent: its details (name, phone, location, services), a page for each city or area it serves with their archive, and the search and answer-engine layer (titles, descriptions, Open Graph, JSON-LD, robots.txt, llms.txt, sitemaps) and a map in the theme's colors. Set it up under Settings → Business.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Requires at least: 6.7
  * Requires PHP: 8.0
  * Requires Plugins: marccent-blocks

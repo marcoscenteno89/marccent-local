@@ -23,13 +23,17 @@ function mcl_register_areas(): void {
 		'labels'        => array(
 			'name'          => $a['plural'],
 			'singular_name' => $a['singular'],
-			'add_new_item'  => 'Add ' . $a['singular'],
-			'edit_item'     => 'Edit ' . $a['singular'],
-			'all_items'     => 'All ' . $a['plural'],
+			/* translators: %s: what an area is called (City) */
+			'add_new_item'  => sprintf( __( 'Add %s', 'marccent-local' ), $a['singular'] ),
+			/* translators: %s: what an area is called (City) */
+			'edit_item'     => sprintf( __( 'Edit %s', 'marccent-local' ), $a['singular'] ),
+			/* translators: %s: what areas are called (Cities) */
+			'all_items'     => sprintf( __( 'All %s', 'marccent-local' ), $a['plural'] ),
 			'archives'      => $a['label'],
 			'menu_name'     => $a['plural'],
 		),
-		'description'   => sprintf( '%s %s serves.', $a['plural'], mcl_settings()['name'] ),
+		/* translators: 1: what areas are called (Cities), 2: the business's name */
+		'description'   => sprintf( __( '%1$s %2$s serves.', 'marccent-local' ), $a['plural'], mcl_settings()['name'] ),
 		'public'        => true,
 		'show_in_rest'  => true,
 		'menu_icon'     => 'dashicons-location',
@@ -71,14 +75,15 @@ add_action( 'init', function () {
 		. "\n\n" . '<!-- wp:template-part {"slug":"footer","theme":"' . $theme . '","tagName":"div"} /-->';
 	$a = mcl_settings()['areas'];
 	register_block_template( 'marccent-local//single-city', array(
-		'title'       => 'Single ' . $a['singular'],
-		'description' => 'An area served: its page content between the site header and footer.',
+		/* translators: %s: what an area is called (City) */
+		'title'       => sprintf( __( 'Single %s', 'marccent-local' ), $a['singular'] ),
+		'description' => __( 'An area served: its page content between the site header and footer.', 'marccent-local' ),
 		'post_types'  => array( 'city' ),
 		'content'     => $frame( '<!-- wp:post-content {"layout":{"type":"default"}} /-->' ),
 	) );
 	register_block_template( 'marccent-local//archive-city', array(
 		'title'       => $a['label'],
-		'description' => 'The areas archive: every area served, by region.',
+		'description' => __( 'The areas archive: every area served, by region.', 'marccent-local' ),
 		'content'     => $frame( '<!-- wp:marccent-local/directory /-->' ),
 	) );
 } );
@@ -86,7 +91,7 @@ add_action( 'init', function () {
 // The directory: the archive's page, rendered here from the areas (no editor script: it's only in the template).
 add_action( 'init', function () {
 	register_block_type( 'marccent-local/directory', array(
-		'title'           => 'Area Directory',
+		'title'           => __( 'Area Directory', 'marccent-local' ),
 		'category'        => 'marccent',
 		'render_callback' => 'mcl_render_directory',
 	) );
@@ -125,7 +130,7 @@ function mcl_render_directory(): string {
 	$regions = mcl_regions();
 	// Areas in no known region still show, last.
 	foreach ( array_diff( array_keys( $by ), array_keys( $regions ) ) as $key ) {
-		$regions[ $key ] = array( 'name' => $key ? ucwords( str_replace( '-', ' ', $key ) ) : 'More ' . strtolower( $s['areas']['plural'] ), 'blurb' => '' );
+		$regions[ $key ] = array( 'name' => $key ? ucwords( str_replace( '-', ' ', $key ) ) : /* translators: %s: what areas are called, lowercase (cities) */ sprintf( __( 'More %s', 'marccent-local' ), strtolower( $s['areas']['plural'] ) ), 'blurb' => '' );
 	}
 
 	$section = fn( $inner, $surface = '', $id = '' ) => sprintf(
@@ -142,7 +147,7 @@ function mcl_render_directory(): string {
 		}
 	}
 	echo $section(
-		mcl_breadcrumbs_html( array( array( 'Home', home_url( '/' ) ), array( $s['areas']['label'], get_post_type_archive_link( 'city' ) ) ) )
+		mcl_breadcrumbs_html( array( array( __( 'Home', 'marccent-local' ), home_url( '/' ) ), array( $s['areas']['label'], get_post_type_archive_link( 'city' ) ) ) )
 		. '<h1>' . esc_html( $c['h1'] ) . '</h1>'
 		. ( $c['lead'] ? '<p class="fs-lg">' . esc_html( $c['lead'] ) . '</p>' : '' )
 		. ( $jump ? '<div class="grid row-wrap gap-sm">' . $jump . '</div>' : '' ),
@@ -181,8 +186,8 @@ function mcl_render_directory(): string {
 
 	// The call to action.
 	if ( $c['cta_heading'] ) {
-		$buttons = mcl_button( 'Request a Quote', $c['quote_href'], 'file-signature', 'light' )
-			. ( $s['phone'] ? mcl_button( 'Call ' . $s['phone'], 'tel:' . $s['telephone'], 'phone', 'dark' ) : '' );
+		$buttons = mcl_button( __( 'Request a Quote', 'marccent-local' ), $c['quote_href'], 'file-signature', 'light' )
+			. ( $s['phone'] ? /* translators: %s: the phone number */ mcl_button( sprintf( __( 'Call %s', 'marccent-local' ), $s['phone'] ), 'tel:' . $s['telephone'], 'phone', 'dark' ) : '' );
 		echo $section( '<h2>' . esc_html( $c['cta_heading'] ) . '</h2>' . ( $c['cta_text'] ? '<p>' . esc_html( $c['cta_text'] ) . '</p>' : '' ) . '<div class="grid auto-cols gap-sm">' . $buttons . '</div>', 'bg-primary' );
 	}
 	return ob_get_clean();

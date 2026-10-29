@@ -80,7 +80,7 @@ function mcl_service( string $slug ): ?array {
  * an example each, since their shape is fixed and few people will edit them by hand.
  */
 add_action( 'admin_menu', function () {
-	add_options_page( 'Business', 'Business', 'manage_options', 'marccent-local', 'mcl_settings_page' );
+	add_options_page( __( 'Business', 'marccent-local' ), __( 'Business', 'marccent-local' ), 'manage_options', 'marccent-local', 'mcl_settings_page' );
 } );
 
 add_action( 'admin_init', function () {
@@ -100,7 +100,8 @@ function mcl_sanitize( $input ): array {
 		} elseif ( in_array( $key, MCL_JSON, true ) ) {
 			$decoded = is_array( $value ) ? $value : json_decode( wp_unslash( (string) $value ), true );
 			if ( ! is_array( $decoded ) ) {
-				add_settings_error( MCL_OPTION, $key, sprintf( '%s is not valid JSON; the previous value was kept.', ucfirst( $key ) ) );
+				/* translators: %s: a setting's name (Services, Regions…) */
+				add_settings_error( MCL_OPTION, $key, sprintf( __( '%s is not valid JSON; the previous value was kept.', 'marccent-local' ), ucfirst( $key ) ) );
 				$decoded = $old[ $key ];
 			}
 			$out[ $key ] = $decoded;
@@ -145,34 +146,34 @@ function mcl_settings_page(): void {
 		}
 		echo '</td></tr>';
 	};
-	echo '<div class="wrap"><h1>Business</h1><form method="post" action="options.php">';
+	echo '<div class="wrap"><h1>' . esc_html__( 'Business', 'marccent-local' ) . '</h1><form method="post" action="options.php">';
 	settings_fields( 'marccent-local' );
-	echo '<h2>Details</h2><table class="form-table" role="presentation">';
-	$field( 'name', 'Name' );
-	$field( 'alternate', 'Other names', 'One per line.' );
-	$field( 'type', 'Kind of business', 'Its <a href="https://schema.org/LocalBusiness" target="_blank" rel="noopener">schema.org type</a>: GeneralContractor, Plumber, HVACBusiness, LocalBusiness…' );
-	$field( 'summary', 'Summary', 'Two or three sentences: what it does and where. Search and AI answers quote it.' );
-	$field( 'telephone', 'Phone (for links)', '+1-555-555-0100' );
-	$field( 'phone', 'Phone (as shown)', '(555) 555-0100' );
-	$field( 'email', 'Email' );
-	$field( 'city', 'City', 'No street address: the business is listed by city.' );
-	$field( 'region', 'State', 'Two letters: ID' );
-	$field( 'country', 'Country', 'Two letters: US' );
-	$field( 'lat', 'Latitude', 'Where the map centers.' );
-	$field( 'lng', 'Longitude' );
-	$field( 'map', 'Google Maps link' );
-	$field( 'same_as', 'Profiles', 'Facebook, Instagram… one link per line.' );
-	$field( 'profession', 'What it is', 'In a phrase: Plumber. Used as "Plumber in Springfield, IL".' );
-	$field( 'services_label', 'Its services, together', 'plumbing services' );
-	$field( 'service_area', 'Service area', 'One line: Springfield and the towns around it in central Illinois' );
-	$field( 'knows_about', 'Specialties', 'One per line.' );
-	$field( 'maps_key', 'Google Maps key', 'A browser key with the Maps JavaScript API, restricted to this site. Empty: Google\'s plain embed.' );
-	echo '</table><h2>Services and areas</h2><table class="form-table" role="presentation">';
-	$field( 'services_parent', 'Services page', 'The slug of the page the service pages sit under.' );
-	$field( 'services', 'Services', 'JSON: <code>[{"slug": "drains", "name": "Drain Cleaning", "type": "Drain cleaning", "covers": "kitchen, bath and main lines…"}]</code>' );
-	$field( 'regions', 'Regions', 'JSON, the groups the areas are listed in: <code>[{"key": "central-illinois", "name": "Central Illinois", "blurb": "…"}]</code>' );
-	$field( 'areas', 'Areas', 'JSON: what an area is called and the archive\'s URL: <code>{"singular": "City", "plural": "Cities", "label": "Service Areas", "slug": "service-areas"}</code>' );
-	$field( 'archive', 'Areas archive', 'JSON, the archive page\'s words: <code>{"title", "description", "h1", "lead", "card_button": "More about %s", "faq_heading", "faq": [{"q", "a"}], "cta_heading", "cta_text", "quote_href"}</code>' );
+	echo '<h2>' . esc_html__( 'Details', 'marccent-local' ) . '</h2><table class="form-table" role="presentation">';
+	$field( 'name', __( 'Name', 'marccent-local' ) );
+	$field( 'alternate', __( 'Other names', 'marccent-local' ), __( 'One per line.', 'marccent-local' ) );
+	$field( 'type', __( 'Kind of business', 'marccent-local' ), __( 'Its <a href="https://schema.org/LocalBusiness" target="_blank" rel="noopener">schema.org type</a>: GeneralContractor, Plumber, HVACBusiness, LocalBusiness…', 'marccent-local' ) );
+	$field( 'summary', __( 'Summary', 'marccent-local' ), __( 'Two or three sentences: what it does and where. Search and AI answers quote it.', 'marccent-local' ) );
+	$field( 'telephone', __( 'Phone (for links)', 'marccent-local' ), __( '+1-555-555-0100', 'marccent-local' ) );
+	$field( 'phone', __( 'Phone (as shown)', 'marccent-local' ), __( '(555) 555-0100', 'marccent-local' ) );
+	$field( 'email', __( 'Email', 'marccent-local' ) );
+	$field( 'city', __( 'City', 'marccent-local' ), __( 'No street address: the business is listed by city.', 'marccent-local' ) );
+	$field( 'region', __( 'State', 'marccent-local' ), __( 'Two letters: ID', 'marccent-local' ) );
+	$field( 'country', __( 'Country', 'marccent-local' ), __( 'Two letters: US', 'marccent-local' ) );
+	$field( 'lat', __( 'Latitude', 'marccent-local' ), __( 'Where the map centers.', 'marccent-local' ) );
+	$field( 'lng', __( 'Longitude', 'marccent-local' ) );
+	$field( 'map', __( 'Google Maps link', 'marccent-local' ) );
+	$field( 'same_as', __( 'Profiles', 'marccent-local' ), __( 'Facebook, Instagram… one link per line.', 'marccent-local' ) );
+	$field( 'profession', __( 'What it is', 'marccent-local' ), __( 'In a phrase: Plumber. Used as "Plumber in Springfield, IL".', 'marccent-local' ) );
+	$field( 'services_label', __( 'Its services, together', 'marccent-local' ), __( 'plumbing services', 'marccent-local' ) );
+	$field( 'service_area', __( 'Service area', 'marccent-local' ), __( 'One line: Springfield and the towns around it in central Illinois', 'marccent-local' ) );
+	$field( 'knows_about', __( 'Specialties', 'marccent-local' ), __( 'One per line.', 'marccent-local' ) );
+	$field( 'maps_key', __( 'Google Maps key', 'marccent-local' ), __( 'A browser key with the Maps JavaScript API, restricted to this site. Empty: Google\'s plain embed.', 'marccent-local' ) );
+	echo '</table><h2>' . esc_html__( 'Services and areas', 'marccent-local' ) . '</h2><table class="form-table" role="presentation">';
+	$field( 'services_parent', __( 'Services page', 'marccent-local' ), __( 'The slug of the page the service pages sit under.', 'marccent-local' ) );
+	$field( 'services', __( 'Services', 'marccent-local' ), __( 'JSON: <code>[{"slug": "drains", "name": "Drain Cleaning", "type": "Drain cleaning", "covers": "kitchen, bath and main lines…"}]</code>', 'marccent-local' ) );
+	$field( 'regions', __( 'Regions', 'marccent-local' ), __( 'JSON, the groups the areas are listed in: <code>[{"key": "central-illinois", "name": "Central Illinois", "blurb": "…"}]</code>', 'marccent-local' ) );
+	$field( 'areas', __( 'Areas', 'marccent-local' ), __( 'JSON: what an area is called and the archive\'s URL: <code>{"singular": "City", "plural": "Cities", "label": "Service Areas", "slug": "service-areas"}</code>', 'marccent-local' ) );
+	$field( 'archive', __( 'Areas archive', 'marccent-local' ), __( 'JSON, the archive page\'s words: <code>{"title", "description", "h1", "lead", "card_button": "More about %s", "faq_heading", "faq": [{"q", "a"}], "cta_heading", "cta_text", "quote_href"}</code>', 'marccent-local' ) );
 	echo '</table>';
 	submit_button();
 	echo '</form></div>';
