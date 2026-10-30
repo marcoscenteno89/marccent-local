@@ -72,7 +72,7 @@ add_action( 'init', function () {
 		. "\n\n" . '<!-- wp:group {"tagName":"main","className":"grid cols-1 gap-0","layout":{"type":"default"}} -->'
 		. "\n" . '<main class="wp-block-group grid cols-1 gap-0">' . $main . '</main>'
 		. "\n" . '<!-- /wp:group -->'
-		. "\n\n" . '<!-- wp:template-part {"slug":"footer","theme":"' . $theme . '","tagName":"div"} /-->';
+		. "\n\n" . '<!-- wp:template-part {"slug":"footer","theme":"' . $theme . '","tagName":"footer"} /-->';
 	$a = mcl_settings()['areas'];
 	register_block_template( 'marccent-local//single-city', array(
 		/* translators: %s: what an area is called (City) */
