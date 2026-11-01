@@ -21,6 +21,7 @@ require MCL_DIR . '/inc/seo.php';
 require MCL_DIR . '/inc/schema.php';
 require MCL_DIR . '/inc/answers.php';
 require MCL_DIR . '/inc/performance.php';
+require MCL_DIR . '/inc/tracking.php';
 
 register_activation_hook( __FILE__, function () {
 	mcl_register_areas();

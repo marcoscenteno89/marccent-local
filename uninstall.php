@@ -9,6 +9,7 @@ defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 $mcl_uninstall = function () {
 	delete_option( 'marccent_local' );
 	delete_option( 'mcl_flush_rewrites' );
+	delete_option( 'mcl_tracking' );
 };
 
 if ( is_multisite() ) {

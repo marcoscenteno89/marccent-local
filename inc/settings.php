@@ -175,6 +175,20 @@ function mcl_settings_page(): void {
 	$field( 'areas', __( 'Areas', 'marccent-local' ), __( 'JSON: what an area is called and the archive\'s URL: <code>{"singular": "City", "plural": "Cities", "label": "Service Areas", "slug": "service-areas"}</code>', 'marccent-local' ) );
 	$field( 'archive', __( 'Areas archive', 'marccent-local' ), __( 'JSON, the archive page\'s words: <code>{"title", "description", "h1", "lead", "card_button": "More about %s", "faq_heading", "faq": [{"q", "a"}], "cta_heading", "cta_text", "quote_href"}</code>', 'marccent-local' ) );
 	echo '</table>';
+	mcl_tracking_fields();
 	submit_button();
 	echo '</form></div>';
 }
+
+// Tools → Marccent export: the business, without the Maps key (a secret, and tied to this site's domain).
+add_filter( 'marccent_export_parts', function ( $parts ) {
+	$parts['business'] = array(
+		'label'  => __( 'Business details (Settings → Business)', 'marccent-local' ),
+		'export' => fn() => array_diff_key( mcl_settings(), array( 'maps_key' => '' ) ),
+		'import' => function ( array $data ) {
+			$data['maps_key'] = mcl_settings()['maps_key'];
+			update_option( MCL_OPTION, mcl_sanitize( $data ) );
+		},
+	);
+	return $parts;
+} );
