@@ -122,7 +122,10 @@ function mcl_breadcrumbs_html( array $trail ): string {
 function mcl_render_directory(): string {
 	$s     = mcl_settings();
 	$c     = $s['archive'];
-	$areas = get_posts( array( 'post_type' => 'city', 'numberposts' => -1, 'orderby' => array( 'menu_order' => 'ASC', 'title' => 'ASC' ) ) );
+	// On the archive, its own query has them all already, in this order (pre_get_posts above): the published ones.
+	$areas = $GLOBALS['wp_the_query']->is_post_type_archive( 'city' )
+		? array_values( array_filter( $GLOBALS['wp_the_query']->posts, fn( $area ) => 'publish' === $area->post_status ) )
+		: get_posts( array( 'post_type' => 'city', 'numberposts' => -1, 'orderby' => array( 'menu_order' => 'ASC', 'title' => 'ASC' ) ) );
 	$by    = array();
 	foreach ( $areas as $area ) {
 		$by[ get_post_meta( $area->ID, 'mcl_region', true ) ][] = $area;

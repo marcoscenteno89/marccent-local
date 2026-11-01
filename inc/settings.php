@@ -53,14 +53,23 @@ function mcl_settings(): array {
 	return $cache;
 }
 
-// The service pages, as [ slug => WP_Post ] (children of the services page).
+// The service pages, as [ slug => WP_Post ] in the services' order (the published children of the services page): the
+// services page, then all of them at once, not a lookup each.
 function mcl_service_pages(): array {
-	$s   = mcl_settings();
+	$s      = mcl_settings();
+	$slugs  = array_column( $s['services'], 'slug' );
+	$parent = $slugs ? get_page_by_path( $s['services_parent'] ) : null;
+	if ( ! $parent ) {
+		return array();
+	}
+	$found = array();
+	foreach ( get_posts( array( 'post_type' => 'page', 'post_parent' => $parent->ID, 'post_name__in' => $slugs, 'numberposts' => -1, 'update_post_meta_cache' => false, 'update_post_term_cache' => false ) ) as $page ) {
+		$found[ $page->post_name ] = $page;
+	}
 	$out = array();
-	foreach ( $s['services'] as $service ) {
-		$page = get_page_by_path( $s['services_parent'] . '/' . $service['slug'] );
-		if ( $page ) {
-			$out[ $service['slug'] ] = $page;
+	foreach ( $slugs as $slug ) {
+		if ( isset( $found[ $slug ] ) ) {
+			$out[ $slug ] = $found[ $slug ];
 		}
 	}
 	return $out;
@@ -114,14 +123,15 @@ function mcl_sanitize( $input ): array {
 		}
 	}
 	if ( ( $out['areas']['slug'] ?? '' ) !== $old['areas']['slug'] ) {
-		update_option( 'mcl_flush_rewrites', 1 );
+		update_option( 'mcl_flush_rewrites', 1, true );
 	}
 	return $out;
 }
 
-// A changed areas URL takes effect once the rewrite rules are rebuilt, on the next load.
+// A changed areas URL takes effect once the rewrite rules are rebuilt, on the next load. The flag is autoloaded, so
+// looking for it among the autoloaded options costs no query (get_option would ask the database every time it's unset).
 add_action( 'init', function () {
-	if ( get_option( 'mcl_flush_rewrites' ) ) {
+	if ( ! empty( wp_load_alloptions()['mcl_flush_rewrites'] ) ) {
 		delete_option( 'mcl_flush_rewrites' );
 		flush_rewrite_rules( false );
 	}

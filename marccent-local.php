@@ -23,6 +23,10 @@ require MCL_DIR . '/inc/answers.php';
 require MCL_DIR . '/inc/performance.php';
 require MCL_DIR . '/inc/tracking.php';
 
+// The plugin's options in one query if they aren't autoloaded or don't exist yet (a site that hasn't saved them), not
+// one each on every page.
+wp_prime_option_caches( array( MCL_OPTION, MCL_TRACKING ) );
+
 register_activation_hook( __FILE__, function () {
 	mcl_register_areas();
 	flush_rewrite_rules( false );

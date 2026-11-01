@@ -10,6 +10,7 @@ $mcl_uninstall = function () {
 	delete_option( 'marccent_local' );
 	delete_option( 'mcl_flush_rewrites' );
 	delete_option( 'mcl_tracking' );
+	delete_transient( 'mcl_schema' );
 };
 
 if ( is_multisite() ) {
