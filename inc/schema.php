@@ -39,14 +39,27 @@ function mcl_faq_node( string $json, string $url ): ?array {
 	);
 }
 
-function mcl_schema_graph(): array {
-	$b       = mcl_settings();
-	$c       = mcl_context();
-	$home    = home_url( '/' );
+/**
+ * What every page's graph starts with (the business with its catalog and the places it serves, the places, the
+ * website) and what a page's own nodes refer to (the catalog, the places' @ids, the areas' names and URLs, the service
+ * pages' IDs). Building it reads the areas, the service pages and the logo, so it's kept, autoloaded, in the mcl_schema
+ * transient: on a page it costs no query. A changed page, area or place forgets it (below); its key covers the rest
+ * (the business, the site's URL and permalinks, the logo and icon).
+ */
+function mcl_schema_site(): array {
+	$b    = mcl_settings();
+	$home = home_url( '/' );
+	$key  = md5( serialize( array( $b, $home, get_option( 'permalink_structure' ), get_theme_mod( 'custom_logo' ), get_option( 'site_icon' ) ) ) );
+	$site = get_transient( 'mcl_schema' );
+	if ( is_array( $site ) && ( $site['key'] ?? '' ) === $key ) {
+		return $site;
+	}
+
 	$biz_id  = $home . '#business';
 	$cities  = get_posts( array( 'post_type' => 'city', 'numberposts' => -1, 'orderby' => 'menu_order', 'order' => 'ASC' ) );
 	$pages   = mcl_service_pages();
 	$logo_id = get_theme_mod( 'custom_logo' );
+	$served  = array_map( fn( $city ) => array( '@id' => get_permalink( $city ) . '#place' ), $cities );
 	// The states the areas are in (names for areaServed, codes for the contact point).
 	$states  = array_values( array_unique( array_filter( array_map( fn( $c ) => get_post_meta( $c->ID, 'mcl_state', true ), $cities ) ) ) );
 	$codes   = array_values( array_unique( array_filter( array_map( fn( $c ) => get_post_meta( $c->ID, 'mcl_state_code', true ), $cities ) ) ) );
@@ -60,8 +73,8 @@ function mcl_schema_graph(): array {
 		);
 	}
 
-	$graph   = array();
-	$graph[] = array(
+	$nodes   = array();
+	$nodes[] = array(
 		'@type'                     => $b['type'] ?: 'LocalBusiness',
 		'@id'                       => $biz_id,
 		'name'                      => $b['name'],
@@ -82,7 +95,7 @@ function mcl_schema_graph(): array {
 		'hasMap'                    => $b['map'],
 		'sameAs'                    => $b['same_as'],
 		'areaServed'                => array_merge(
-			array_map( fn( $city ) => array( '@id' => get_permalink( $city ) . '#place' ), $cities ),
+			$served,
 			array_map( fn( $state ) => array( '@type' => 'State', 'name' => $state ), $states )
 		),
 		'knowsAbout'                => $b['knows_about'],
@@ -91,9 +104,9 @@ function mcl_schema_graph(): array {
 	);
 	// The places served, once each (the business's areaServed refers to them).
 	foreach ( $cities as $city ) {
-		$graph[] = mcl_place( $city );
+		$nodes[] = mcl_place( $city );
 	}
-	$graph[] = array(
+	$nodes[] = array(
 		'@type'      => 'WebSite',
 		'@id'        => $home . '#website',
 		'url'        => $home,
@@ -101,6 +114,46 @@ function mcl_schema_graph(): array {
 		'publisher'  => array( '@id' => $biz_id ),
 		'inLanguage' => 'en-US',
 	);
+
+	$site = array(
+		'key'      => $key,
+		'nodes'    => $nodes,
+		'catalog'  => $catalog,
+		'served'   => $served,
+		'areas'    => array_map( fn( $city ) => array( get_the_title( $city ), get_permalink( $city ) ), $cities ),
+		'services' => array_map( fn( $p ) => $p->ID, $pages ),
+	);
+	set_transient( 'mcl_schema', $site );
+	return $site;
+}
+
+// Forget the shared part when a page or an area changes (its title, URL, order or status) or a place's details do; the
+// next page builds it again. Only if it's there: an import touches many posts and meta.
+function mcl_schema_forget(): void {
+	if ( false !== get_transient( 'mcl_schema' ) ) {
+		delete_transient( 'mcl_schema' );
+	}
+}
+add_action( 'clean_post_cache', function ( $id, $post ) {
+	if ( in_array( $post->post_type, array( 'page', 'city' ), true ) ) {
+		mcl_schema_forget();
+	}
+}, 10, 2 );
+foreach ( array( 'added_post_meta', 'updated_post_meta', 'deleted_post_meta' ) as $mcl_hook ) {
+	add_action( $mcl_hook, function ( $meta_ids, $object_id, $meta_key ) {
+		if ( in_array( $meta_key, array( 'mcl_state', 'mcl_state_code', 'mcl_county', 'mcl_lat', 'mcl_lng' ), true ) ) {
+			mcl_schema_forget();
+		}
+	}, 10, 3 );
+}
+
+function mcl_schema_graph(): array {
+	$b      = mcl_settings();
+	$c      = mcl_context();
+	$site   = mcl_schema_site();
+	$home   = home_url( '/' );
+	$biz_id = $home . '#business';
+	$graph  = $site['nodes'];
 	if ( ! $c['url'] || is_404() ) {
 		return $graph;
 	}
@@ -145,11 +198,11 @@ function mcl_schema_graph(): array {
 			'provider'    => array( '@id' => $biz_id ),
 			'areaServed'  => array( '@id' => $url . '#place' ),
 			'url'         => $url,
-			'hasOfferCatalog' => array( '@type' => 'OfferCatalog', 'name' => ucfirst( $b['services_label'] ) . ' in ' . $name, 'itemListElement' => $catalog ),
+			'hasOfferCatalog' => array( '@type' => 'OfferCatalog', 'name' => ucfirst( $b['services_label'] ) . ' in ' . $name, 'itemListElement' => $site['catalog'] ),
 		);
 		$page['about']      = array( '@id' => $url . '#service' );
 		$page['spatialCoverage'] = array( '@id' => $url . '#place' );
-	} elseif ( $post && 'page' === $post->post_type && ( $slug = array_search( $post->ID, array_map( fn( $p ) => $p->ID, $pages ), true ) ) ) {
+	} elseif ( $post && 'page' === $post->post_type && ( $slug = array_search( $post->ID, $site['services'], true ) ) ) {
 		// A service page.
 		$s       = mcl_service( $slug );
 		$graph[] = array(
@@ -159,7 +212,7 @@ function mcl_schema_graph(): array {
 			'serviceType' => $s['type'],
 			'description' => $c['description'],
 			'provider'    => array( '@id' => $biz_id ),
-			'areaServed'  => array_map( fn( $city ) => array( '@id' => get_permalink( $city ) . '#place' ), $cities ),
+			'areaServed'  => $site['served'],
 			'url'         => $url,
 		);
 		$page['about'] = array( '@id' => $url . '#service' );
@@ -167,13 +220,13 @@ function mcl_schema_graph(): array {
 		$page['mainEntity'] = array(
 			'@type'           => 'ItemList',
 			'name'            => $b['areas']['plural'] . ' served',
-			'itemListElement' => array_map( fn( $city, $i ) => array( '@type' => 'ListItem', 'position' => $i + 1, 'name' => get_the_title( $city ), 'url' => get_permalink( $city ) ), $cities, array_keys( $cities ) ),
+			'itemListElement' => array_map( fn( $area, $i ) => array( '@type' => 'ListItem', 'position' => $i + 1, 'name' => $area[0], 'url' => $area[1] ), $site['areas'], array_keys( $site['areas'] ) ),
 		);
 	}
 
 	$faq = $post ? mcl_faq_node( (string) get_post_meta( $post->ID, 'mcl_faq', true ), $url ) : null;
 	if ( is_post_type_archive( 'city' ) ) {
-		$faq = mcl_faq_node( wp_json_encode( mcl_settings()['archive']['faq'] ), $url );
+		$faq = mcl_faq_node( wp_json_encode( $b['archive']['faq'] ), $url );
 	}
 	if ( $faq ) {
 		$graph[] = $faq;

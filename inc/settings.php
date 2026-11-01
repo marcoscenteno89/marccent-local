@@ -53,14 +53,23 @@ function mcl_settings(): array {
 	return $cache;
 }
 
-// The service pages, as [ slug => WP_Post ] (children of the services page).
+// The service pages, as [ slug => WP_Post ] in the services' order (the published children of the services page): the
+// services page, then all of them at once, not a lookup each.
 function mcl_service_pages(): array {
-	$s   = mcl_settings();
+	$s      = mcl_settings();
+	$slugs  = array_column( $s['services'], 'slug' );
+	$parent = $slugs ? get_page_by_path( $s['services_parent'] ) : null;
+	if ( ! $parent ) {
+		return array();
+	}
+	$found = array();
+	foreach ( get_posts( array( 'post_type' => 'page', 'post_parent' => $parent->ID, 'post_name__in' => $slugs, 'numberposts' => -1, 'update_post_meta_cache' => false, 'update_post_term_cache' => false ) ) as $page ) {
+		$found[ $page->post_name ] = $page;
+	}
 	$out = array();
-	foreach ( $s['services'] as $service ) {
-		$page = get_page_by_path( $s['services_parent'] . '/' . $service['slug'] );
-		if ( $page ) {
-			$out[ $service['slug'] ] = $page;
+	foreach ( $slugs as $slug ) {
+		if ( isset( $found[ $slug ] ) ) {
+			$out[ $slug ] = $found[ $slug ];
 		}
 	}
 	return $out;
@@ -114,14 +123,15 @@ function mcl_sanitize( $input ): array {
 		}
 	}
 	if ( ( $out['areas']['slug'] ?? '' ) !== $old['areas']['slug'] ) {
-		update_option( 'mcl_flush_rewrites', 1 );
+		update_option( 'mcl_flush_rewrites', 1, true );
 	}
 	return $out;
 }
 
-// A changed areas URL takes effect once the rewrite rules are rebuilt, on the next load.
+// A changed areas URL takes effect once the rewrite rules are rebuilt, on the next load. The flag is autoloaded, so
+// looking for it among the autoloaded options costs no query (get_option would ask the database every time it's unset).
 add_action( 'init', function () {
-	if ( get_option( 'mcl_flush_rewrites' ) ) {
+	if ( ! empty( wp_load_alloptions()['mcl_flush_rewrites'] ) ) {
 		delete_option( 'mcl_flush_rewrites' );
 		flush_rewrite_rules( false );
 	}
@@ -175,6 +185,20 @@ function mcl_settings_page(): void {
 	$field( 'areas', __( 'Areas', 'marccent-local' ), __( 'JSON: what an area is called and the archive\'s URL: <code>{"singular": "City", "plural": "Cities", "label": "Service Areas", "slug": "service-areas"}</code>', 'marccent-local' ) );
 	$field( 'archive', __( 'Areas archive', 'marccent-local' ), __( 'JSON, the archive page\'s words: <code>{"title", "description", "h1", "lead", "card_button": "More about %s", "faq_heading", "faq": [{"q", "a"}], "cta_heading", "cta_text", "quote_href"}</code>', 'marccent-local' ) );
 	echo '</table>';
+	mcl_tracking_fields();
 	submit_button();
 	echo '</form></div>';
 }
+
+// Tools → Marccent export: the business, without the Maps key (a secret, and tied to this site's domain).
+add_filter( 'marccent_export_parts', function ( $parts ) {
+	$parts['business'] = array(
+		'label'  => __( 'Business details (Settings → Business)', 'marccent-local' ),
+		'export' => fn() => array_diff_key( mcl_settings(), array( 'maps_key' => '' ) ),
+		'import' => function ( array $data ) {
+			$data['maps_key'] = mcl_settings()['maps_key'];
+			update_option( MCL_OPTION, mcl_sanitize( $data ) );
+		},
+	);
+	return $parts;
+} );

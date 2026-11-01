@@ -38,7 +38,7 @@ function mcl_context(): array {
 	$ctx  = array( 'post' => null, 'title' => '', 'description' => '', 'url' => '', 'image' => '', 'trail' => array( $home ), 'type' => 'WebPage' );
 
 	if ( is_post_type_archive( 'city' ) ) {
-		$a                  = mcl_settings()['archive'];
+		$a                  = $b['archive'];
 		$ctx['title']       = $a['title'];
 		$ctx['description'] = $a['description'];
 		$ctx['url']         = get_post_type_archive_link( 'city' );
