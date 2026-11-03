@@ -67,7 +67,9 @@ function mcl_redirect_match( string $path ): ?array {
 		if ( str_ends_with( $from, '/*' ) ) {
 			$base = substr( $from, 0, -2 );
 			if ( ( $path === $base || str_starts_with( $path, $base . '/' ) ) && ( ! $best || strlen( $base ) > strlen( $best[2] ) ) ) {
-				$rest = ltrim( substr( $path, strlen( $base ) ), '/' );
+				// The rest of the path, each segment URL-encoded: it can't change where the address goes (a backslash,
+				// "//", "http:") but only extend the administrator's target.
+				$rest = implode( '/', array_map( 'rawurlencode', array_filter( explode( '/', substr( $path, strlen( $base ) ) ), 'strlen' ) ) );
 				$to   = str_ends_with( $r['to'], '*' ) ? rtrim( substr( $r['to'], 0, -1 ), '/' ) . ( '' !== $rest ? '/' . $rest : '' ) : $r['to'];
 				$best = array( $to, (int) $r['code'], $base, $from );
 			}
@@ -105,7 +107,8 @@ add_action( 'template_redirect', function () {
 		$to .= '/';
 	}
 	$query = (string) wp_parse_url( $uri, PHP_URL_QUERY );
-	$url   = str_contains( $to, '://' ) ? $to : home_url( $to );
+	// Absolute or not by the stored target, never by what the visitor's path added to it.
+	$url   = str_starts_with( mcl_redirects()[ $from ]['to'] ?? '', '/' ) ? home_url( '/' . ltrim( $to, '/' ) ) : $to;
 	if ( '' !== $query && ! str_contains( $url, '?' ) ) {
 		$url .= '?' . $query; // campaign tags and the like carry over
 	}
