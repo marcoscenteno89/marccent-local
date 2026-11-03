@@ -46,7 +46,8 @@ foreach ( MCL_TRACKING_HOOKS as $key => [ $hook, $priority ] ) {
 		if ( is_admin() || is_feed() || is_embed() || is_customize_preview() ) {
 			return;
 		}
-		$code = mcl_tracking()[ $key ];
+		// Cookie consent (inc/consent.php) may hold it until the visitor accepts.
+		$code = (string) apply_filters( 'mcl_tracking_code', mcl_tracking()[ $key ], $key );
 		if ( '' !== $code ) {
 			echo "\n" . $code . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput -- an administrator's tracking code, as pasted.
 		}

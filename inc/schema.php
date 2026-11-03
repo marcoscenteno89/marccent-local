@@ -49,7 +49,7 @@ function mcl_faq_node( string $json, string $url ): ?array {
 function mcl_schema_site(): array {
 	$b    = mcl_settings();
 	$home = home_url( '/' );
-	$key  = md5( serialize( array( $b, $home, get_option( 'permalink_structure' ), get_theme_mod( 'custom_logo' ), get_option( 'site_icon' ) ) ) );
+	$key  = md5( serialize( array( $b, wp_date( 'Y-m-d' ), $home, get_option( 'permalink_structure' ), get_theme_mod( 'custom_logo' ), get_option( 'site_icon' ) ) ) );
 	$site = get_transient( 'mcl_schema' );
 	if ( is_array( $site ) && ( $site['key'] ?? '' ) === $key ) {
 		return $site;
@@ -73,8 +73,9 @@ function mcl_schema_site(): array {
 		);
 	}
 
-	$nodes   = array();
-	$nodes[] = array(
+	$locations = mcl_locations_schema( $b, $biz_id );
+	$nodes     = array();
+	$nodes[]   = array(
 		'@type'                     => $b['type'] ?: 'LocalBusiness',
 		'@id'                       => $biz_id,
 		'name'                      => $b['name'],
@@ -99,9 +100,14 @@ function mcl_schema_site(): array {
 			array_map( fn( $state ) => array( '@type' => 'State', 'name' => $state ), $states )
 		),
 		'knowsAbout'                => $b['knows_about'],
+		'openingHoursSpecification' => mcl_hours_schema(),
+		'specialOpeningHoursSpecification' => mcl_special_schema(),
+		'department'                => array_map( fn( $l ) => array( '@id' => $l['@id'] ), $locations ),
 		'hasOfferCatalog'           => array( '@type' => 'OfferCatalog', 'name' => ucfirst( $b['services_label'] ), 'itemListElement' => $catalog ),
 		'contactPoint'              => array( '@type' => 'ContactPoint', 'contactType' => 'customer service', 'telephone' => $b['telephone'], 'email' => $b['email'], 'areaServed' => array_map( fn( $code ) => $b['country'] . '-' . $code, $codes ), 'availableLanguage' => 'English' ),
 	);
+	// Its locations, each a business of its own (the business's departments).
+	$nodes = array_merge( $nodes, $locations );
 	// The places served, once each (the business's areaServed refers to them).
 	foreach ( $cities as $city ) {
 		$nodes[] = mcl_place( $city );

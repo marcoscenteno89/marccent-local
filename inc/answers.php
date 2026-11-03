@@ -26,7 +26,20 @@ function mcl_llms_txt(): string {
 	if ( $b['service_area'] ) {
 		$lines[] = '- Service area: ' . $b['service_area'];
 	}
+	if ( mcl_has_hours() ) {
+		$week    = array_map( fn( $day, $name ) => $name . ' ' . ( $b['hours'][ $day ] ?: 'closed' ), array_keys( MCL_DAYS ), MCL_DAYS );
+		$lines[] = '- Hours: ' . implode( '; ', $week ) . ' (' . wp_timezone_string() . ')';
+	}
 	$lines[] = '';
+
+	if ( $locations = mcl_locations() ) {
+		$lines[] = '## Locations';
+		$lines[] = '';
+		foreach ( $locations as $l ) {
+			$lines[] = sprintf( '- %s: %s, %s, %s %s%s', $l['name'], $l['street'], $l['city'], $l['region'], $l['postal'], $l['phone'] ? ' · ' . $l['phone'] : '' );
+		}
+		$lines[] = '';
+	}
 
 	$lines[] = '## Services';
 	$lines[] = '';

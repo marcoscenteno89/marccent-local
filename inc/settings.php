@@ -36,6 +36,10 @@ function mcl_defaults(): array {
 		'areas'           => array( 'singular' => 'City', 'plural' => 'Cities', 'label' => 'Service Areas', 'slug' => 'service-areas' ),
 		'archive'         => array( 'title' => '', 'description' => '', 'h1' => 'Service Areas', 'lead' => '', 'card_button' => 'More about %s', 'faq_heading' => 'Questions', 'faq' => array(), 'cta_heading' => '', 'cta_text' => '', 'quote_href' => '#form' ),
 		'maps_key'        => '',               // a browser key for the Maps JavaScript API
+		'hours'           => array_fill_keys( array( 'mo', 'tu', 'we', 'th', 'fr', 'sa', 'su' ), '' ), // 08:00-17:00 (or 08:00-12:00, 13:00-17:00); empty: closed
+		'closures'        => array(),          // [ { date: 2026-12-25, hours: '' (closed) or 09:00-12:00, note } ]: holidays and other exceptions
+		'locations'       => array(),          // [ { slug, name, street, city, region, postal, telephone, phone, lat, lng, map, hours } ]: its offices or shops, each listed on its own
+		'indexnow'        => true,             // tell Bing, Yandex and the like when a page changes (inc/indexnow.php)
 	);
 }
 
@@ -97,7 +101,7 @@ add_action( 'admin_init', function () {
 } );
 
 const MCL_LINES = array( 'alternate', 'same_as', 'knows_about' );
-const MCL_JSON  = array( 'services', 'regions', 'areas', 'archive' );
+const MCL_JSON  = array( 'services', 'regions', 'areas', 'archive', 'locations' );
 
 function mcl_sanitize( $input ): array {
 	$old = mcl_settings();
@@ -114,6 +118,12 @@ function mcl_sanitize( $input ): array {
 				$decoded = $old[ $key ];
 			}
 			$out[ $key ] = $decoded;
+		} elseif ( 'hours' === $key ) {
+			$out[ $key ] = mcl_hours_sanitize( (array) $value );
+		} elseif ( 'closures' === $key ) {
+			$out[ $key ] = is_array( $value ) ? mcl_closures_sanitize( $value ) : mcl_closures_parse( wp_unslash( (string) $value ) );
+		} elseif ( 'indexnow' === $key ) {
+			$out[ $key ] = ! empty( $value );
 		} elseif ( in_array( $key, array( 'map' ), true ) ) {
 			$out[ $key ] = esc_url_raw( (string) $value );
 		} elseif ( 'summary' === $key ) {
@@ -178,6 +188,13 @@ function mcl_settings_page(): void {
 	$field( 'service_area', __( 'Service area', 'marccent-local' ), __( 'One line: Springfield and the towns around it in central Illinois', 'marccent-local' ) );
 	$field( 'knows_about', __( 'Specialties', 'marccent-local' ), __( 'One per line.', 'marccent-local' ) );
 	$field( 'maps_key', __( 'Google Maps key', 'marccent-local' ), __( 'A browser key with the Maps JavaScript API, restricted to this site. Empty: Google\'s plain embed.', 'marccent-local' ) );
+	echo '</table>';
+	mcl_hours_fields( $s );
+	echo '<h2>' . esc_html__( 'Locations', 'marccent-local' ) . '</h2><table class="form-table" role="presentation">';
+	$field( 'locations', __( 'Offices or shops', 'marccent-local' ), __( 'JSON, only when the business has more than one place customers visit; each is listed on its own in search: <code>[{"slug": "downtown", "name": "Downtown", "street": "12 Main St", "city": "Boise", "region": "ID", "postal": "83702", "telephone": "+1-208-555-0100", "phone": "(208) 555-0100", "lat": 43.61, "lng": -116.2, "map": "https://maps.google.com/…", "hours": {"mo": "08:00-17:00"}}]</code>. Its hours: the business\'s when left out. Show them with <code>[business_locations]</code>.', 'marccent-local' ) );
+	echo '</table>';
+	echo '<h2>' . esc_html__( 'Search engines', 'marccent-local' ) . '</h2><table class="form-table" role="presentation">';
+	printf( '<tr><th scope="row">IndexNow</th><td><input type="hidden" name="%1$s[indexnow]" value="0"><label><input type="checkbox" name="%1$s[indexnow]" value="1" %2$s> %3$s</label><p class="description">%4$s</p></td></tr>', esc_attr( MCL_OPTION ), checked( $s['indexnow'], true, false ), esc_html__( 'Tell Bing, Yandex and other IndexNow engines when a page is published or changed', 'marccent-local' ), esc_html__( 'They crawl it within minutes instead of days. Google doesn\'t take part; it reads the sitemap. Never sent from a .localhost or .test site.', 'marccent-local' ) );
 	echo '</table><h2>' . esc_html__( 'Services and areas', 'marccent-local' ) . '</h2><table class="form-table" role="presentation">';
 	$field( 'services_parent', __( 'Services page', 'marccent-local' ), __( 'The slug of the page the service pages sit under.', 'marccent-local' ) );
 	$field( 'services', __( 'Services', 'marccent-local' ), __( 'JSON: <code>[{"slug": "drains", "name": "Drain Cleaning", "type": "Drain cleaning", "covers": "kitchen, bath and main lines…"}]</code>', 'marccent-local' ) );
@@ -186,6 +203,7 @@ function mcl_settings_page(): void {
 	$field( 'archive', __( 'Areas archive', 'marccent-local' ), __( 'JSON, the archive page\'s words: <code>{"title", "description", "h1", "lead", "card_button": "More about %s", "faq_heading", "faq": [{"q", "a"}], "cta_heading", "cta_text", "quote_href"}</code>', 'marccent-local' ) );
 	echo '</table>';
 	mcl_tracking_fields();
+	mcl_consent_fields();
 	submit_button();
 	echo '</form></div>';
 }
