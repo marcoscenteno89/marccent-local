@@ -42,35 +42,12 @@ add_action( 'enqueue_block_assets', function () {
 	wp_add_inline_style( 'marccent', (string) file_get_contents( MCL_DIR . '/assets/site.css' ) );
 }, 20 );
 
-// Whether the page has a map (.local-map), seen as its blocks render: a block theme renders them all before the head.
-add_filter( 'render_block', function ( $html ) {
-	if ( ! is_admin() && $html && str_contains( $html, 'local-map' ) ) {
-		$GLOBALS['mcl_has_map'] = true;
-	}
-	return $html;
-} );
-
-// The map (assets/map.js), in the site palette's two colors, on pages with one; without a Maps key it's Google's
-// plain embed.
+// The map is marccent-theme's (data-component="map": Marccent Blocks loads the theme's engine, which draws it). Its key
+// is the business's (Settings → Business) for the whole page, so it stays out of the content; without one, the
+// map's data-embed is Google's plain embed.
 add_action( 'wp_enqueue_scripts', function () {
-	if ( empty( $GLOBALS['mcl_has_map'] ) ) {
-		return;
+	$key = mcl_settings()['maps_key'];
+	if ( $key && wp_script_is( 'marccent', 'registered' ) ) {
+		wp_add_inline_script( 'marccent', 'window.marccentMapsKey = ' . wp_json_encode( $key ) . ';', 'before' );
 	}
-	$palette = mcl_palette();
-	wp_enqueue_script( 'marccent-local-map', plugins_url( 'assets/map.js', __FILE__ ), array(), filemtime( MCL_DIR . '/assets/map.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
-	wp_add_inline_script( 'marccent-local-map', 'window.marccentLocalMap = ' . wp_json_encode( array( 'key' => mcl_settings()['maps_key'], 'primary' => $palette[0], 'secondary' => $palette[1] ) ) . ';', 'before' );
-} );
-
-/**
- * The site's two brand colors (Marccent Blocks' starting palette, the marccent_defaults option), for the map.
- */
-function mcl_palette(): array {
-	$d  = function_exists( 'marccent_blocks_defaults' ) ? marccent_blocks_defaults() : array();
-	$id = $d['palette'] ?? '';
-	foreach ( $d['palettes'] ?? array() as $p ) {
-		if ( ( $p['id'] ?? '' ) === $id ) {
-			return array( $p['primary'], $p['secondary'] );
-		}
-	}
-	return array( '#1f64cf', '#e4572e' );
-}
+}, 21 );
