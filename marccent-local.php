@@ -23,6 +23,7 @@ require MCL_DIR . '/inc/answers.php';
 require MCL_DIR . '/inc/performance.php';
 require MCL_DIR . '/inc/tracking.php';
 require MCL_DIR . '/inc/consent.php';
+require MCL_DIR . '/inc/callbar.php';
 require MCL_DIR . '/inc/hours.php';
 require MCL_DIR . '/inc/redirects.php';
 require MCL_DIR . '/inc/indexnow.php';

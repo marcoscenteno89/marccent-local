@@ -204,6 +204,7 @@ function mcl_settings_page(): void {
 	echo '</table>';
 	mcl_tracking_fields();
 	mcl_consent_fields();
+	mcl_callbar_fields();
 	submit_button();
 	echo '</form></div>';
 }
