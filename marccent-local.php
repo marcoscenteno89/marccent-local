@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Marccent Local
  * Description: A small local business on Marccent: its details (name, phone, location, opening hours, locations, services), a page for each city or area it serves with their archive, the search and answer-engine layer (titles, descriptions, Open Graph, JSON-LD, robots.txt, llms.txt, sitemaps, IndexNow), redirects with a 404 log, tracking codes with cookie consent, and a map in the theme's colors. Set it up under Settings → Business and Tools → Redirects.
- * Version: 0.2.0
+ * Version: 0.2.1
  * Requires at least: 6.7
  * Requires PHP: 8.0
  * Requires Plugins: marccent-blocks

@@ -229,7 +229,7 @@ add_shortcode( 'business_locations', function () {
 		$address = trim( $l['street'] . ', ' . trim( $l['city'] . ', ' . $l['region'] . ' ' . $l['postal'], ', ' ), ', ' );
 		[ $open, $text ] = mcl_has_hours( $l['hours'] ) ? mcl_open_status( $l['hours'] ) : array( false, '' );
 		$out .= sprintf(
-			'<div class="mcl-location card pad round"><h3>%s</h3><p>%s</p>%s%s%s%s</div>',
+			'<div class="mcl-location bg border round pad grid cols-1 content-start gap-sm"><h3>%s</h3><p>%s</p>%s%s%s%s</div>',
 			esc_html( $l['name'] ),
 			esc_html( $address ),
 			$l['phone'] ? sprintf( '<p><a href="tel:%s">%s</a></p>', esc_attr( $l['telephone'] ?: $l['phone'] ), esc_html( $l['phone'] ) ) : '',
@@ -238,7 +238,7 @@ add_shortcode( 'business_locations', function () {
 			$l['map'] ? sprintf( '<p><a href="%s" target="_blank" rel="noopener">%s</a></p>', esc_url( $l['map'] ), esc_html__( 'Directions', 'marccent-local' ) ) : ''
 		);
 	}
-	return $out ? '<div class="mcl-locations grid cols-2 gap">' . $out . '</div>' : '';
+	return $out ? '<div class="mcl-locations grid cols-2">' . $out . '</div>' : '';
 } );
 
 /* Settings → Business: the week, then the days that differ */

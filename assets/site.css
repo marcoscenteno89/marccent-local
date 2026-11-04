@@ -6,13 +6,10 @@
 .breadcrumbs a { color: inherit; text-underline-offset: 0.2em; }
 .breadcrumbs [aria-current] { font-weight: 600; }
 
-/* Links inside text on colored bands and boxes keep the band's text color. */
-:is(.bg-primary, .bg-secondary) :is(p, li) a:not(.btn) { color: inherit; text-decoration: underline; text-underline-offset: 0.2em; }
 
 /* Key facts: a definition list of short label / value rows. */
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.5rem 1rem; margin: 0; }
 .facts dt { font-weight: 700; }
-.facts dd { margin: 0; }
 
 /* Tables in the content scroll on their own on narrow screens instead of widening the page. */
 .wp-block-table { overflow-x: auto; }

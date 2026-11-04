@@ -153,7 +153,7 @@ function mcl_render_directory(): string {
 		mcl_breadcrumbs_html( array( array( __( 'Home', 'marccent-local' ), home_url( '/' ) ), array( $s['areas']['label'], get_post_type_archive_link( 'city' ) ) ) )
 		. '<h1>' . esc_html( $c['h1'] ) . '</h1>'
 		. ( $c['lead'] ? '<p class="fs-lg">' . esc_html( $c['lead'] ) . '</p>' : '' )
-		. ( $jump ? '<div class="grid row-wrap gap-sm">' . $jump . '</div>' : '' ),
+		. ( $jump ? '<div class="row-wrap gap-sm">' . $jump . '</div>' : '' ),
 		'bg-secondary'
 	);
 
