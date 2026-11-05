@@ -21,6 +21,23 @@ function mcl_regions(): array {
 	return $out;
 }
 
+// A city's own fields (custom fields, in full words), which schema, the directory and the map read.
+const MCL_CITY_FIELDS = array( 'state', 'state_code', 'county', 'region', 'latitude', 'longitude' );
+
+// Once: the names older versions saved (mcl_state, mcl_lat…, a page's mcl_faq) renamed to the full words.
+add_action( 'init', function () {
+	global $wpdb;
+	if ( get_option( 'mcl_full_word_fields' ) ) {
+		return;
+	}
+	$renames = array( 'mcl_state' => 'state', 'mcl_state_code' => 'state_code', 'mcl_county' => 'county', 'mcl_region' => 'region', 'mcl_lat' => 'latitude', 'mcl_lng' => 'longitude', 'mcl_faq' => 'questions' );
+	foreach ( $renames as $old => $new ) {
+		$wpdb->update( $wpdb->postmeta, array( 'meta_key' => $new ), array( 'meta_key' => $old ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
+	}
+	wp_cache_flush();
+	update_option( 'mcl_full_word_fields', 1 );
+}, 1 );
+
 function mcl_register_areas(): void {
 	$a = mcl_settings()['areas'];
 	register_post_type( 'city', array(
@@ -46,7 +63,7 @@ function mcl_register_areas(): void {
 		'rewrite'       => array( 'slug' => $a['slug'], 'with_front' => false ),
 		'supports'      => array( 'title', 'editor', 'excerpt', 'thumbnail', 'custom-fields', 'page-attributes', 'revisions' ),
 	) );
-	foreach ( array( 'mcl_state', 'mcl_state_code', 'mcl_county', 'mcl_region', 'mcl_lat', 'mcl_lng' ) as $key ) {
+	foreach ( MCL_CITY_FIELDS as $key ) {
 		register_post_meta( 'city', $key, array(
 			'type'              => 'string',
 			'single'            => true,
@@ -132,7 +149,7 @@ function mcl_render_directory(): string {
 		: get_posts( array( 'post_type' => 'city', 'numberposts' => -1, 'orderby' => array( 'menu_order' => 'ASC', 'title' => 'ASC' ) ) );
 	$by    = array();
 	foreach ( $areas as $area ) {
-		$by[ get_post_meta( $area->ID, 'mcl_region', true ) ][] = $area;
+		$by[ get_post_meta( $area->ID, 'region', true ) ][] = $area;
 	}
 	$regions = mcl_regions();
 	// Areas in no known region still show, last.
@@ -170,8 +187,8 @@ function mcl_render_directory(): string {
 		$cards = '';
 		foreach ( $by[ $key ] as $area ) {
 			$name   = get_the_title( $area );
-			$code   = get_post_meta( $area->ID, 'mcl_state_code', true );
-			$county = get_post_meta( $area->ID, 'mcl_county', true );
+			$code   = get_post_meta( $area->ID, 'state_code', true );
+			$county = get_post_meta( $area->ID, 'county', true );
 			$cards .= sprintf(
 				'<article class="bg border round pad grid cols-1 content-start gap-sm"><h3><a href="%1$s">%2$s</a></h3>%3$s<p>%4$s</p>%5$s</article>',
 				esc_url( get_permalink( $area ) ), esc_html( $code ? "$name, $code" : $name ),
@@ -186,7 +203,8 @@ function mcl_render_directory(): string {
 	if ( $c['faq'] ) {
 		$faq = '';
 		foreach ( $c['faq'] as $qa ) {
-			$faq .= '<div class="grid cols-1 gap-sm"><h3>' . esc_html( $qa['q'] ) . '</h3><p>' . esc_html( $qa['a'] ) . '</p></div>';
+			[ $question, $answer ] = mcl_question( $qa );
+			$faq                  .= '<div class="grid cols-1 gap-sm"><h3>' . esc_html( $question ) . '</h3><p>' . esc_html( $answer ) . '</p></div>';
 		}
 		echo $section( '<h2>' . esc_html( $c['faq_heading'] ) . '</h2><div class="grid cols-2 gap-lg">' . $faq . '</div>', 'bg' );
 	}

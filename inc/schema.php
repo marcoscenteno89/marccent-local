@@ -1,88 +1,56 @@
 <?php
 /**
- * JSON-LD: one @graph per page, its nodes linked by @id: the business (its schema.org type, with its address, map,
- * service area and catalog of services), the website, this page with its breadcrumbs, and what the page is about (a
- * service, a service in a city, the directory of cities) with its questions and answers.
+ * The business's part of the page's JSON-LD, which Marccent Content builds (its inc/schema.php: the website, the page,
+ * its breadcrumbs, what the fields and the Loops show): the business itself (the site's Organization, as its schema.org
+ * type, with its address, map, service area and catalog of services), its locations and the places it serves, a
+ * Service on a service page or a city page, and the areas archive (its words, list and questions). Without Marccent
+ * Content there's no JSON-LD.
  */
 
 defined( 'ABSPATH' ) || exit;
 
-/**
- * What the current request is about, for the JSON-LD: title, description, URL, image, the breadcrumb trail ([ name,
- * url ] pairs from Home) and the post (if it's one). The title and description are the ones search sees: Rank Math's
- * (its Paper, as it prints them in the head), else the page's own.
- */
-function mcl_context(): array {
-	static $ctx = null;
-	if ( null !== $ctx ) {
-		return $ctx;
-	}
-	$b    = mcl_settings();
-	$home = array( __( 'Home', 'marccent-local' ), home_url( '/' ) );
-	$ctx  = array( 'post' => null, 'title' => '', 'description' => '', 'url' => '', 'image' => '', 'trail' => array( $home ), 'type' => 'WebPage' );
-
+// The areas archive: its title and description are Settings → Business's (the archive's words).
+add_filter( 'marccent_schema_context', function ( array $ctx ) {
 	if ( is_post_type_archive( 'city' ) ) {
-		$a                  = $b['archive'];
-		$ctx['title']       = $a['title'];
-		$ctx['description'] = $a['description'];
-		$ctx['url']         = get_post_type_archive_link( 'city' );
-		$ctx['trail'][]     = array( $b['areas']['label'], $ctx['url'] );
-		$ctx['type']        = 'CollectionPage';
-	} elseif ( is_singular() ) {
-		$post               = get_queried_object();
-		$ctx['post']        = $post;
-		$ctx['title']       = get_the_title( $post );
-		$ctx['description'] = wp_trim_words( wp_strip_all_tags( get_the_excerpt( $post ) ), 30, '…' );
-		$ctx['url']         = get_permalink( $post );
-		if ( has_post_thumbnail( $post ) ) {
-			$ctx['image'] = get_the_post_thumbnail_url( $post, 'large' );
-		}
-		if ( 'city' === $post->post_type ) {
-			$ctx['trail'][] = array( $b['areas']['label'], get_post_type_archive_link( 'city' ) );
-		}
-		foreach ( array_reverse( get_post_ancestors( $post ) ) as $ancestor ) {
-			$ctx['trail'][] = array( get_the_title( $ancestor ), get_permalink( $ancestor ) );
-		}
-		if ( ! is_front_page() ) {
-			$ctx['trail'][] = array( get_the_title( $post ), $ctx['url'] );
-		}
-		if ( is_front_page() ) {
-			$ctx['url'] = home_url( '/' );
-		}
-	} else {
-		$ctx['url'] = home_url( add_query_arg( array() ) );
-	}
-	// The default share image: the brand's.
-	if ( ! $ctx['image'] ) {
-		$ctx['image'] = get_site_icon_url( 512 );
-	}
-	if ( class_exists( '\\RankMath\\Paper\\Paper' ) ) {
-		$paper              = \RankMath\Paper\Paper::get();
-		$ctx['title']       = $paper->get_title() ?: $ctx['title'];
-		$ctx['description'] = $paper->get_description() ?: $ctx['description'];
+		$a                  = mcl_settings()['archive'];
+		$ctx['title']       = $a['title'] ?: $ctx['title'];
+		$ctx['description'] = $a['description'] ?: $ctx['description'];
 	}
 	return $ctx;
-}
+} );
 
-
+// A place the business serves: its city's node from its fields' schema (Fields → Field groups → City details), else
+// built here from the city's fields.
 function mcl_place( WP_Post $city ): array {
-	$state = get_post_meta( $city->ID, 'mcl_state', true );
+	$node = function_exists( 'mcc_schema_post_node' ) ? mcc_schema_post_node( $city ) : null;
+	if ( $node ) {
+		return $node;
+	}
+	$state = get_post_meta( $city->ID, 'state', true );
 	return array(
 		'@type'            => 'City',
 		'@id'              => get_permalink( $city ) . '#place',
+		'url'              => get_permalink( $city ),
 		'name'             => get_the_title( $city ) . ', ' . $state,
-		'geo'              => array( '@type' => 'GeoCoordinates', 'latitude' => (float) get_post_meta( $city->ID, 'mcl_lat', true ), 'longitude' => (float) get_post_meta( $city->ID, 'mcl_lng', true ) ),
+		'geo'              => array( '@type' => 'GeoCoordinates', 'latitude' => (float) get_post_meta( $city->ID, 'latitude', true ), 'longitude' => (float) get_post_meta( $city->ID, 'longitude', true ) ),
 		'containedInPlace' => array(
 			'@type'            => 'AdministrativeArea',
-			'name'             => get_post_meta( $city->ID, 'mcl_county', true ) . ', ' . $state,
+			'name'             => get_post_meta( $city->ID, 'county', true ) . ', ' . $state,
 			'containedInPlace' => array( '@type' => 'State', 'name' => $state ),
 		),
 	);
 }
 
-// A page's questions, [ { q, a } ]: its Questions rows (Marccent Content), or JSON as older imports saved them.
+// A question and its answer: [ question, answer ], from { question, answer } (or { q, a }, as older saves have them).
+function mcl_question( $qa ): array {
+	$qa = (array) $qa;
+	return array( (string) ( $qa['question'] ?? $qa['q'] ?? '' ), (string) ( $qa['answer'] ?? $qa['a'] ?? '' ) );
+}
+
+// A page's questions, [ { question, answer } ]: its Questions rows (Marccent Content), or JSON as older imports saved them.
 function mcl_faq_node( $faq, string $url ): ?array {
-	$faq = is_array( $faq ) ? array_values( array_filter( $faq, fn( $qa ) => ! empty( $qa['q'] ) && ! empty( $qa['a'] ) ) ) : json_decode( (string) $faq, true );
+	$faq = is_array( $faq ) ? $faq : json_decode( (string) $faq, true );
+	$faq = array_values( array_filter( array_map( 'mcl_question', (array) $faq ), fn( $qa ) => '' !== $qa[0] && '' !== $qa[1] ) );
 	if ( ! $faq ) {
 		return null;
 	}
@@ -92,15 +60,14 @@ function mcl_faq_node( $faq, string $url ): ?array {
 		'isPartOf'   => array( '@id' => $url . '#webpage' ),
 		'mainEntity' => array_map( fn( $qa ) => array(
 			'@type'          => 'Question',
-			'name'           => $qa['q'],
-			'acceptedAnswer' => array( '@type' => 'Answer', 'text' => $qa['a'] ),
+			'name'           => $qa[0],
+			'acceptedAnswer' => array( '@type' => 'Answer', 'text' => $qa[1] ),
 		), $faq ),
 	);
 }
 
 /**
- * What every page's graph starts with (the business with its catalog and the places it serves, the places, the
- * website) and what a page's own nodes refer to (the catalog, the places' @ids, the areas' names and URLs, the service
+ * What every page's graph has (the business with its catalog and the places it serves, its locations, the places) and what a page's own nodes refer to (the catalog, the places' @ids, the areas' names and URLs, the service
  * pages' IDs). Building it reads the areas, the service pages and the logo, so it's kept, autoloaded, in the mcl_schema
  * transient: on a page it costs no query. A changed page, area or place forgets it (below); its key covers the rest
  * (the business, the site's URL and permalinks, the logo and icon).
@@ -108,7 +75,7 @@ function mcl_faq_node( $faq, string $url ): ?array {
 function mcl_schema_site(): array {
 	$b    = mcl_settings();
 	$home = home_url( '/' );
-	$key  = md5( serialize( array( $b, wp_date( 'Y-m-d' ), $home, get_option( 'permalink_structure' ), get_theme_mod( 'custom_logo' ), get_option( 'site_icon' ) ) ) );
+	$key  = md5( serialize( array( $b, wp_date( 'Y-m-d' ), $home, get_option( 'permalink_structure' ), get_theme_mod( 'custom_logo' ), get_option( 'site_icon' ), get_option( 'marccent_content' ) ) ) ); // the fields' schemas too: the places
 	$site = get_transient( 'mcl_schema' );
 	if ( is_array( $site ) && ( $site['key'] ?? '' ) === $key ) {
 		return $site;
@@ -120,8 +87,8 @@ function mcl_schema_site(): array {
 	$logo_id = get_theme_mod( 'custom_logo' );
 	$served  = array_map( fn( $city ) => array( '@id' => get_permalink( $city ) . '#place' ), $cities );
 	// The states the areas are in (names for areaServed, codes for the contact point).
-	$states  = array_values( array_unique( array_filter( array_map( fn( $c ) => get_post_meta( $c->ID, 'mcl_state', true ), $cities ) ) ) );
-	$codes   = array_values( array_unique( array_filter( array_map( fn( $c ) => get_post_meta( $c->ID, 'mcl_state_code', true ), $cities ) ) ) );
+	$states  = array_values( array_unique( array_filter( array_map( fn( $c ) => get_post_meta( $c->ID, 'state', true ), $cities ) ) ) );
+	$codes   = array_values( array_unique( array_filter( array_map( fn( $c ) => get_post_meta( $c->ID, 'state_code', true ), $cities ) ) ) );
 
 	$catalog = array();
 	foreach ( $b['services'] as $s ) {
@@ -171,14 +138,6 @@ function mcl_schema_site(): array {
 	foreach ( $cities as $city ) {
 		$nodes[] = mcl_place( $city );
 	}
-	$nodes[] = array(
-		'@type'      => 'WebSite',
-		'@id'        => $home . '#website',
-		'url'        => $home,
-		'name'       => $b['name'],
-		'publisher'  => array( '@id' => $biz_id ),
-		'inLanguage' => 'en-US',
-	);
 
 	$site = array(
 		'key'      => $key,
@@ -206,71 +165,50 @@ add_action( 'clean_post_cache', function ( $id, $post ) {
 }, 10, 2 );
 foreach ( array( 'added_post_meta', 'updated_post_meta', 'deleted_post_meta' ) as $mcl_hook ) {
 	add_action( $mcl_hook, function ( $meta_ids, $object_id, $meta_key ) {
-		if ( in_array( $meta_key, array( 'mcl_state', 'mcl_state_code', 'mcl_county', 'mcl_lat', 'mcl_lng' ), true ) ) {
+		if ( in_array( $meta_key, array( 'state', 'state_code', 'county', 'latitude', 'longitude' ), true ) ) {
 			mcl_schema_forget();
 		}
 	}, 10, 3 );
 }
 
-function mcl_schema_graph(): array {
+// The business is the site's Organization.
+add_filter( 'marccent_schema_organization', fn() => mcl_schema_site()['nodes'][0] );
+
+// Its locations and places on every page; a Service on a city page or a service page; the areas archive's list and
+// questions.
+add_filter( 'marccent_schema_graph', function ( array $graph, array $c ) {
 	$b      = mcl_settings();
-	$c      = mcl_context();
 	$site   = mcl_schema_site();
-	$home   = home_url( '/' );
-	$biz_id = $home . '#business';
-	$graph  = $site['nodes'];
-	if ( ! $c['url'] || is_404() ) {
+	$biz_id = home_url( '/' ) . '#business';
+	foreach ( array_slice( $site['nodes'], 1 ) as $node ) {
+		$graph[ $node['@id'] ] = ( $graph[ $node['@id'] ] ?? array() ) + $node;
+	}
+	$url = $c['url'];
+	if ( ! $url || ! isset( $graph[ $url . '#webpage' ] ) ) {
 		return $graph;
 	}
-
-	$url     = $c['url'];
-	$crumbs  = array();
-	foreach ( $c['trail'] as $i => [ $name, $link ] ) {
-		$crumbs[] = array( '@type' => 'ListItem', 'position' => $i + 1, 'name' => $name, 'item' => $link );
-	}
-	$page = array(
-		'@type'       => $c['type'],
-		'@id'         => $url . '#webpage',
-		'url'         => $url,
-		'name'        => $c['title'],
-		'description' => $c['description'],
-		'isPartOf'    => array( '@id' => $home . '#website' ),
-		'about'       => array( '@id' => $biz_id ),
-		'inLanguage'  => 'en-US',
-	);
-	if ( count( $crumbs ) > 1 ) {
-		$page['breadcrumb'] = array( '@id' => $url . '#breadcrumb' );
-		$graph[]            = array( '@type' => 'BreadcrumbList', '@id' => $url . '#breadcrumb', 'itemListElement' => $crumbs );
-	}
-	if ( $c['post'] ) {
-		$page['datePublished'] = get_post_time( 'c', true, $c['post'] );
-		$page['dateModified']  = get_post_modified_time( 'c', true, $c['post'] );
-		if ( $c['image'] ) {
-			$page['primaryImageOfPage'] = array( '@type' => 'ImageObject', 'url' => $c['image'] );
-		}
-	}
-
+	$page = &$graph[ $url . '#webpage' ];
 	$post = $c['post'];
 	if ( $post && 'city' === $post->post_type ) {
 		// A city page: the business's services, there.
-		$name    = get_the_title( $post );
-		$graph[] = array(
-			'@type'       => 'Service',
-			'@id'         => $url . '#service',
-			'name'        => $b['profession'] . ' in ' . $name . ( ( $code = get_post_meta( $post->ID, 'mcl_state_code', true ) ) ? ', ' . $code : '' ),
-			'serviceType' => $b['profession'],
-			'description' => $c['description'],
-			'provider'    => array( '@id' => $biz_id ),
-			'areaServed'  => array( '@id' => $url . '#place' ),
-			'url'         => $url,
+		$name                       = get_the_title( $post );
+		$graph[ $url . '#service' ] = array(
+			'@type'           => 'Service',
+			'@id'             => $url . '#service',
+			'name'            => $b['profession'] . ' in ' . $name . ( ( $code = get_post_meta( $post->ID, 'state_code', true ) ) ? ', ' . $code : '' ),
+			'serviceType'     => $b['profession'],
+			'description'     => $c['description'],
+			'provider'        => array( '@id' => $biz_id ),
+			'areaServed'      => array( '@id' => $url . '#place' ),
+			'url'             => $url,
 			'hasOfferCatalog' => array( '@type' => 'OfferCatalog', 'name' => ucfirst( $b['services_label'] ) . ' in ' . $name, 'itemListElement' => $site['catalog'] ),
 		);
-		$page['about']      = array( '@id' => $url . '#service' );
+		$page['about']           = array( '@id' => $url . '#service' );
 		$page['spatialCoverage'] = array( '@id' => $url . '#place' );
 	} elseif ( $post && 'page' === $post->post_type && ( $slug = array_search( $post->ID, $site['services'], true ) ) ) {
 		// A service page.
-		$s       = mcl_service( $slug );
-		$graph[] = array(
+		$s                          = mcl_service( $slug );
+		$graph[ $url . '#service' ] = array(
 			'@type'       => 'Service',
 			'@id'         => $url . '#service',
 			'name'        => $s['name'],
@@ -287,30 +225,11 @@ function mcl_schema_graph(): array {
 			'name'            => $b['areas']['plural'] . ' served',
 			'itemListElement' => array_map( fn( $area, $i ) => array( '@type' => 'ListItem', 'position' => $i + 1, 'name' => $area[0], 'url' => $area[1] ), $site['areas'], array_keys( $site['areas'] ) ),
 		);
-	}
-
-	$faq = $post ? mcl_faq_node( get_post_meta( $post->ID, 'mcl_faq', true ), $url ) : null;
-	if ( is_post_type_archive( 'city' ) ) {
 		$faq = mcl_faq_node( wp_json_encode( $b['archive']['faq'] ), $url );
-	}
-	if ( $faq ) {
-		$graph[] = $faq;
-	}
-	$graph[] = $page;
-	return $graph;
-}
-
-add_action( 'wp_head', function () {
-	$graph = mcl_schema_graph();
-	// Drop empty values (an @id with no page yet, a missing image) so validators see only real ones.
-	$clean = function ( $v ) use ( &$clean ) {
-		if ( ! is_array( $v ) ) {
-			return $v;
+		if ( $faq ) {
+			$graph[ $faq['@id'] ] = $faq;
 		}
-		$list = array_is_list( $v );
-		$v    = array_filter( array_map( $clean, $v ), fn( $x ) => null !== $x && '' !== $x && array() !== $x );
-		return $list ? array_values( $v ) : $v;
-	};
-	// < > & as \u escapes, so nothing in the data (an SEO title, a FAQ answer) can close the script tag.
-	printf( "<script type=\"application/ld+json\">%s</script>\n", wp_json_encode( array( '@context' => 'https://schema.org', '@graph' => $clean( $graph ) ), JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
-}, 5 );
+	}
+	unset( $page );
+	return $graph;
+}, 10, 2 );

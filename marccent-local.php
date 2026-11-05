@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Marccent Local
- * Description: A small local business on Marccent: its details (name, phone, location, opening hours, locations, services), a page for each city or area it serves with their archive, its JSON-LD (the business, its services and cities, each page's questions), tracking codes with cookie consent, the phone call bar and a map in the theme's colors. Titles, descriptions, sitemaps, redirects, IndexNow and llms.txt are Rank Math's. Set it up under Settings → Business.
+ * Description: A small local business on Marccent: its details (name, phone, location, opening hours, locations, services), a page for each city or area it serves with their archive, its JSON-LD (the business, its services and cities, each page's questions), the phone call bar and a map in the theme's colors. Tracking codes and cookie consent are the Marccent WP theme's. Titles, descriptions, sitemaps, redirects, IndexNow and llms.txt are Rank Math's. Set it up under Settings → Business.
  * Version: 0.3.0
  * Requires at least: 6.7
  * Requires PHP: 8.0
@@ -18,14 +18,12 @@ const MCL_DIR = __DIR__;
 require MCL_DIR . '/inc/settings.php';
 require MCL_DIR . '/inc/areas.php';
 require MCL_DIR . '/inc/schema.php';
-require MCL_DIR . '/inc/tracking.php';
-require MCL_DIR . '/inc/consent.php';
 require MCL_DIR . '/inc/callbar.php';
 require MCL_DIR . '/inc/hours.php';
 
 // The plugin's options in one query if they aren't autoloaded or don't exist yet (a site that hasn't saved them), not
 // one each on every page.
-wp_prime_option_caches( array( MCL_OPTION, MCL_TRACKING, MCL_CONSENT ) );
+wp_prime_option_caches( array( MCL_OPTION ) );
 
 register_activation_hook( __FILE__, function () {
 	mcl_register_areas();

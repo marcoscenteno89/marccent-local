@@ -2,7 +2,7 @@
 /**
  * Call bar: on phones, a bar fixed to the bottom of the screen with Call (the business's phone, Settings → Business)
  * and Get a quote (a link: the quote form's anchor). Most local visitors are on a phone, and these are the two things
- * they came to do. The mcl_callbar option; Settings → Business, after cookie consent. Hidden on wider screens, where
+ * they came to do. The mcl_callbar option; Settings → Business, at the end. Hidden on wider screens, where
  * the header's call button and the page's forms are in view.
  */
 
@@ -79,10 +79,10 @@ add_action( 'wp_enqueue_scripts', function () {
 	if ( ! mcl_callbar()['on'] ) {
 		return;
 	}
-	wp_add_inline_style( 'marccent', '.mcl-callbar{position:fixed;inset:auto 0 0 0;z-index:9990;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:.5rem;padding:.5rem max(.75rem,env(safe-area-inset-right)) calc(.5rem + env(safe-area-inset-bottom)) max(.75rem,env(safe-area-inset-left));background:var(--body-bg,#fff);box-shadow:0 -.25rem 1rem rgb(0 0 0/.15)}.mcl-callbar .btn{width:100%;justify-content:center}@media (min-width:48.01rem){.mcl-callbar{display:none}}@media (max-width:48rem){body{padding-bottom:calc(4.25rem + env(safe-area-inset-bottom))}.mcl-consent{bottom:calc(4.75rem + env(safe-area-inset-bottom))}}' );
+	wp_add_inline_style( 'marccent', '.mcl-callbar{position:fixed;inset:auto 0 0 0;z-index:9990;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:.5rem;padding:.5rem max(.75rem,env(safe-area-inset-right)) calc(.5rem + env(safe-area-inset-bottom)) max(.75rem,env(safe-area-inset-left));background:var(--body-bg,#fff);box-shadow:0 -.25rem 1rem rgb(0 0 0/.15)}.mcl-callbar .btn{width:100%;justify-content:center}@media (min-width:48.01rem){.mcl-callbar{display:none}}@media (max-width:48rem){body{padding-bottom:calc(4.25rem + env(safe-area-inset-bottom))}.marccent-consent{bottom:calc(4.75rem + env(safe-area-inset-bottom))}}' );
 }, 20 );
 
-// Its part of Settings → Business, after cookie consent.
+// Its part of Settings → Business, at the end.
 function mcl_callbar_fields(): void {
 	$c    = mcl_callbar();
 	$name = fn( $key ) => esc_attr( MCL_CALLBAR . "[$key]" );
