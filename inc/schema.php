@@ -7,6 +7,64 @@
 
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * What the current request is about, for the JSON-LD: title, description, URL, image, the breadcrumb trail ([ name,
+ * url ] pairs from Home) and the post (if it's one). The title and description are the ones search sees: Rank Math's
+ * (its Paper, as it prints them in the head), else the page's own.
+ */
+function mcl_context(): array {
+	static $ctx = null;
+	if ( null !== $ctx ) {
+		return $ctx;
+	}
+	$b    = mcl_settings();
+	$home = array( __( 'Home', 'marccent-local' ), home_url( '/' ) );
+	$ctx  = array( 'post' => null, 'title' => '', 'description' => '', 'url' => '', 'image' => '', 'trail' => array( $home ), 'type' => 'WebPage' );
+
+	if ( is_post_type_archive( 'city' ) ) {
+		$a                  = $b['archive'];
+		$ctx['title']       = $a['title'];
+		$ctx['description'] = $a['description'];
+		$ctx['url']         = get_post_type_archive_link( 'city' );
+		$ctx['trail'][]     = array( $b['areas']['label'], $ctx['url'] );
+		$ctx['type']        = 'CollectionPage';
+	} elseif ( is_singular() ) {
+		$post               = get_queried_object();
+		$ctx['post']        = $post;
+		$ctx['title']       = get_the_title( $post );
+		$ctx['description'] = wp_trim_words( wp_strip_all_tags( get_the_excerpt( $post ) ), 30, '…' );
+		$ctx['url']         = get_permalink( $post );
+		if ( has_post_thumbnail( $post ) ) {
+			$ctx['image'] = get_the_post_thumbnail_url( $post, 'large' );
+		}
+		if ( 'city' === $post->post_type ) {
+			$ctx['trail'][] = array( $b['areas']['label'], get_post_type_archive_link( 'city' ) );
+		}
+		foreach ( array_reverse( get_post_ancestors( $post ) ) as $ancestor ) {
+			$ctx['trail'][] = array( get_the_title( $ancestor ), get_permalink( $ancestor ) );
+		}
+		if ( ! is_front_page() ) {
+			$ctx['trail'][] = array( get_the_title( $post ), $ctx['url'] );
+		}
+		if ( is_front_page() ) {
+			$ctx['url'] = home_url( '/' );
+		}
+	} else {
+		$ctx['url'] = home_url( add_query_arg( array() ) );
+	}
+	// The default share image: the brand's.
+	if ( ! $ctx['image'] ) {
+		$ctx['image'] = get_site_icon_url( 512 );
+	}
+	if ( class_exists( '\\RankMath\\Paper\\Paper' ) ) {
+		$paper              = \RankMath\Paper\Paper::get();
+		$ctx['title']       = $paper->get_title() ?: $ctx['title'];
+		$ctx['description'] = $paper->get_description() ?: $ctx['description'];
+	}
+	return $ctx;
+}
+
+
 function mcl_place( WP_Post $city ): array {
 	$state = get_post_meta( $city->ID, 'mcl_state', true );
 	return array(
@@ -22,8 +80,9 @@ function mcl_place( WP_Post $city ): array {
 	);
 }
 
-function mcl_faq_node( string $json, string $url ): ?array {
-	$faq = json_decode( $json, true );
+// A page's questions, [ { q, a } ]: its Questions rows (Marccent Content), or JSON as older imports saved them.
+function mcl_faq_node( $faq, string $url ): ?array {
+	$faq = is_array( $faq ) ? array_values( array_filter( $faq, fn( $qa ) => ! empty( $qa['q'] ) && ! empty( $qa['a'] ) ) ) : json_decode( (string) $faq, true );
 	if ( ! $faq ) {
 		return null;
 	}
@@ -230,7 +289,7 @@ function mcl_schema_graph(): array {
 		);
 	}
 
-	$faq = $post ? mcl_faq_node( (string) get_post_meta( $post->ID, 'mcl_faq', true ), $url ) : null;
+	$faq = $post ? mcl_faq_node( get_post_meta( $post->ID, 'mcl_faq', true ), $url ) : null;
 	if ( is_post_type_archive( 'city' ) ) {
 		$faq = mcl_faq_node( wp_json_encode( $b['archive']['faq'] ), $url );
 	}

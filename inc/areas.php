@@ -8,11 +8,15 @@
 
 defined( 'ABSPATH' ) || exit;
 
-// The regions, in the directory's order: [ key => [ name, blurb ] ].
+// The regions, in the directory's order: [ key => [ name, blurb ] ]. The site's Regions rows (Marccent Content's Site
+// content, which the pages' Loops list too) when it has them, else Settings → Business's.
 function mcl_regions(): array {
-	$out = array();
-	foreach ( mcl_settings()['regions'] as $r ) {
-		$out[ $r['key'] ] = array( 'name' => $r['name'], 'blurb' => $r['blurb'] ?? '' );
+	$rows = function_exists( 'mcc_group_value' ) ? mcc_group_value( 'regions' ) : array();
+	$out  = array();
+	foreach ( $rows ?: mcl_settings()['regions'] as $r ) {
+		if ( ! empty( $r['key'] ) ) {
+			$out[ $r['key'] ] = array( 'name' => $r['name'] ?? $r['key'], 'blurb' => $r['blurb'] ?? '' );
+		}
 	}
 	return $out;
 }

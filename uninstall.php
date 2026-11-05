@@ -1,6 +1,6 @@
 <?php
 /**
- * Deleting the plugin: its settings go (the business, tracking codes, consent, redirects and the 404 log, the IndexNow key), on every site of a network. The city pages (the city post type) and the SEO
+ * Deleting the plugin: its settings go (the business, tracking codes, consent, and what older versions kept: redirects, the 404 log, the IndexNow key), on every site of a network. The city pages (the city post type) and the SEO
  * fields on posts stay: they're the site's content, and they come back as they were if the plugin is installed again.
  */
 

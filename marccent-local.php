@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Marccent Local
- * Description: A small local business on Marccent: its details (name, phone, location, opening hours, locations, services), a page for each city or area it serves with their archive, the search and answer-engine layer (titles, descriptions, Open Graph, JSON-LD, robots.txt, llms.txt, sitemaps, IndexNow), redirects with a 404 log, tracking codes with cookie consent, and a map in the theme's colors. Set it up under Settings → Business and Tools → Redirects.
- * Version: 0.2.1
+ * Description: A small local business on Marccent: its details (name, phone, location, opening hours, locations, services), a page for each city or area it serves with their archive, its JSON-LD (the business, its services and cities, each page's questions), tracking codes with cookie consent, the phone call bar and a map in the theme's colors. Titles, descriptions, sitemaps, redirects, IndexNow and llms.txt are Rank Math's. Set it up under Settings → Business.
+ * Version: 0.3.0
  * Requires at least: 6.7
  * Requires PHP: 8.0
  * Requires Plugins: marccent-blocks
@@ -17,20 +17,15 @@ const MCL_DIR = __DIR__;
 
 require MCL_DIR . '/inc/settings.php';
 require MCL_DIR . '/inc/areas.php';
-require MCL_DIR . '/inc/seo.php';
 require MCL_DIR . '/inc/schema.php';
-require MCL_DIR . '/inc/answers.php';
-require MCL_DIR . '/inc/performance.php';
 require MCL_DIR . '/inc/tracking.php';
 require MCL_DIR . '/inc/consent.php';
 require MCL_DIR . '/inc/callbar.php';
 require MCL_DIR . '/inc/hours.php';
-require MCL_DIR . '/inc/redirects.php';
-require MCL_DIR . '/inc/indexnow.php';
 
 // The plugin's options in one query if they aren't autoloaded or don't exist yet (a site that hasn't saved them), not
 // one each on every page.
-wp_prime_option_caches( array( MCL_OPTION, MCL_TRACKING, MCL_CONSENT, MCL_REDIRECTS ) );
+wp_prime_option_caches( array( MCL_OPTION, MCL_TRACKING, MCL_CONSENT ) );
 
 register_activation_hook( __FILE__, function () {
 	mcl_register_areas();
@@ -41,3 +36,17 @@ register_activation_hook( __FILE__, function () {
 add_action( 'enqueue_block_assets', function () {
 	wp_add_inline_style( 'marccent', (string) file_get_contents( MCL_DIR . '/assets/site.css' ) );
 }, 20 );
+
+// A Map block left empty (Marccent Blocks) shows the business: its coordinates, its name and city on the pin, its
+// Google Maps link, and Google's embed of it for a site without a key.
+add_filter( 'marccent_blocks_map', function ( array $map ) {
+	$b     = mcl_settings();
+	$where = trim( $b['name'] . ', ' . $b['city'] . ( $b['region'] ? ', ' . $b['region'] : '' ), ', ' );
+	return $map + array_filter( array(
+		'lat'   => $b['lat'],
+		'lng'   => $b['lng'],
+		'title' => $where,
+		'link'  => $b['map'],
+		'embed' => 'https://www.google.com/maps?q=' . rawurlencode( $where ) . '&output=embed',
+	) );
+} );
