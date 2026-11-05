@@ -39,7 +39,7 @@ administrator who can post unfiltered HTML can change them.
 
 ## Export
 
-Tools → Marccent export (Marccent Blocks) exports and imports the business details (without the Maps key, a secret tied to the site's domain), the tracking codes, the consent banner and the redirects.
+Tools → Marccent export (Marccent Blocks) exports and imports the business details, the tracking codes, the consent banner and the redirects.
 
 ## Uninstalling
 

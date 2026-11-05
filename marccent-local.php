@@ -41,13 +41,3 @@ register_activation_hook( __FILE__, function () {
 add_action( 'enqueue_block_assets', function () {
 	wp_add_inline_style( 'marccent', (string) file_get_contents( MCL_DIR . '/assets/site.css' ) );
 }, 20 );
-
-// The map is marccent-theme's (data-component="map": Marccent Blocks loads the theme's engine, which draws it). Its key
-// is the business's (Settings → Business) for the whole page, so it stays out of the content; without one, the
-// map's data-embed is Google's plain embed.
-add_action( 'wp_enqueue_scripts', function () {
-	$key = mcl_settings()['maps_key'];
-	if ( $key && wp_script_is( 'marccent', 'registered' ) ) {
-		wp_add_inline_script( 'marccent', 'window.marccentMapsKey = ' . wp_json_encode( $key ) . ';', 'before' );
-	}
-}, 21 );

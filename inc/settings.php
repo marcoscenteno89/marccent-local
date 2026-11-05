@@ -35,7 +35,6 @@ function mcl_defaults(): array {
 		'regions'         => array(),          // [ { key, name, blurb } ]: the areas' groups, in order
 		'areas'           => array( 'singular' => 'City', 'plural' => 'Cities', 'label' => 'Service Areas', 'slug' => 'service-areas' ),
 		'archive'         => array( 'title' => '', 'description' => '', 'h1' => 'Service Areas', 'lead' => '', 'card_button' => 'More about %s', 'faq_heading' => 'Questions', 'faq' => array(), 'cta_heading' => '', 'cta_text' => '', 'quote_href' => '#form' ),
-		'maps_key'        => '',               // a browser key for the Maps JavaScript API
 		'hours'           => array_fill_keys( array( 'mo', 'tu', 'we', 'th', 'fr', 'sa', 'su' ), '' ), // 08:00-17:00 (or 08:00-12:00, 13:00-17:00); empty: closed
 		'closures'        => array(),          // [ { date: 2026-12-25, hours: '' (closed) or 09:00-12:00, note } ]: holidays and other exceptions
 		'locations'       => array(),          // [ { slug, name, street, city, region, postal, telephone, phone, lat, lng, map, hours } ]: its offices or shops, each listed on its own
@@ -187,7 +186,6 @@ function mcl_settings_page(): void {
 	$field( 'services_label', __( 'Its services, together', 'marccent-local' ), __( 'plumbing services', 'marccent-local' ) );
 	$field( 'service_area', __( 'Service area', 'marccent-local' ), __( 'One line: Springfield and the towns around it in central Illinois', 'marccent-local' ) );
 	$field( 'knows_about', __( 'Specialties', 'marccent-local' ), __( 'One per line.', 'marccent-local' ) );
-	$field( 'maps_key', __( 'Google Maps key', 'marccent-local' ), __( 'A browser key with the Maps JavaScript API, restricted to this site. Empty: Google\'s plain embed.', 'marccent-local' ) );
 	echo '</table>';
 	mcl_hours_fields( $s );
 	echo '<h2>' . esc_html__( 'Locations', 'marccent-local' ) . '</h2><table class="form-table" role="presentation">';
@@ -209,13 +207,12 @@ function mcl_settings_page(): void {
 	echo '</form></div>';
 }
 
-// Tools → Marccent export: the business, without the Maps key (a secret, and tied to this site's domain).
+// Tools → Marccent export: the business. (Its Maps key is Marccent Blocks', Appearance → Marccent settings.)
 add_filter( 'marccent_export_parts', function ( $parts ) {
 	$parts['business'] = array(
 		'label'  => __( 'Business details (Settings → Business)', 'marccent-local' ),
-		'export' => fn() => array_diff_key( mcl_settings(), array( 'maps_key' => '' ) ),
+		'export' => fn() => mcl_settings(),
 		'import' => function ( array $data ) {
-			$data['maps_key'] = mcl_settings()['maps_key'];
 			update_option( MCL_OPTION, mcl_sanitize( $data ) );
 		},
 	);
