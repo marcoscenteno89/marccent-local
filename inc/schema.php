@@ -3,21 +3,11 @@
  * The business's part of the page's JSON-LD, which Marccent Content builds (its inc/schema.php: the website, the page,
  * its breadcrumbs, what the fields and the Loops show): the business itself (the site's Organization, as its schema.org
  * type, with its address, map, service area and catalog of services), its locations and the places it serves, a
- * Service on a service page or a city page, and the areas archive (its words, list and questions). Without Marccent
- * Content there's no JSON-LD.
+ * Service on a service page or a city page. The Service Areas page's list and questions are Marccent Content's (its
+ * Loops and Questions rows).
  */
 
 defined( 'ABSPATH' ) || exit;
-
-// The areas archive: its title and description are Settings → Business's (the archive's words).
-add_filter( 'marccent_schema_context', function ( array $ctx ) {
-	if ( is_post_type_archive( 'city' ) ) {
-		$a                  = mcl_settings()['archive'];
-		$ctx['title']       = $a['title'] ?: $ctx['title'];
-		$ctx['description'] = $a['description'] ?: $ctx['description'];
-	}
-	return $ctx;
-} );
 
 // A place the business serves: its city's node from its fields' schema (Fields → Field groups → City details), else
 // built here from the city's fields.
@@ -41,34 +31,9 @@ function mcl_place( WP_Post $city ): array {
 	);
 }
 
-// A question and its answer: [ question, answer ], from { question, answer } (or { q, a }, as older saves have them).
-function mcl_question( $qa ): array {
-	$qa = (array) $qa;
-	return array( (string) ( $qa['question'] ?? $qa['q'] ?? '' ), (string) ( $qa['answer'] ?? $qa['a'] ?? '' ) );
-}
-
-// A page's questions, [ { question, answer } ]: its Questions rows (Marccent Content), or JSON as older imports saved them.
-function mcl_faq_node( $faq, string $url ): ?array {
-	$faq = is_array( $faq ) ? $faq : json_decode( (string) $faq, true );
-	$faq = array_values( array_filter( array_map( 'mcl_question', (array) $faq ), fn( $qa ) => '' !== $qa[0] && '' !== $qa[1] ) );
-	if ( ! $faq ) {
-		return null;
-	}
-	return array(
-		'@type'      => 'FAQPage',
-		'@id'        => $url . '#faq',
-		'isPartOf'   => array( '@id' => $url . '#webpage' ),
-		'mainEntity' => array_map( fn( $qa ) => array(
-			'@type'          => 'Question',
-			'name'           => $qa[0],
-			'acceptedAnswer' => array( '@type' => 'Answer', 'text' => $qa[1] ),
-		), $faq ),
-	);
-}
-
 /**
- * What every page's graph has (the business with its catalog and the places it serves, its locations, the places) and what a page's own nodes refer to (the catalog, the places' @ids, the areas' names and URLs, the service
- * pages' IDs). Building it reads the areas, the service pages and the logo, so it's kept, autoloaded, in the mcl_schema
+ * What every page's graph has (the business with its catalog and the places it serves, its locations, the places) and
+ * what a page's own nodes refer to (the catalog, the places' @ids, the service pages' IDs). Building it reads the areas, the service pages and the logo, so it's kept, autoloaded, in the mcl_schema
  * transient: on a page it costs no query. A changed page, area or place forgets it (below); its key covers the rest
  * (the business, the site's URL and permalinks, the logo and icon).
  */
@@ -114,8 +79,10 @@ function mcl_schema_site(): array {
 		'image'                     => get_site_icon_url( 512 ),
 		'address'                   => array(
 			'@type'           => 'PostalAddress',
+			'streetAddress'   => $b['street'],
 			'addressLocality' => $b['city'],
 			'addressRegion'   => $b['region'],
+			'postalCode'      => $b['postal'],
 			'addressCountry'  => $b['country'],
 		),
 		'geo'                       => '' !== $b['lat'] ? array( '@type' => 'GeoCoordinates', 'latitude' => (float) $b['lat'], 'longitude' => (float) $b['lng'] ) : null,
@@ -144,7 +111,6 @@ function mcl_schema_site(): array {
 		'nodes'    => $nodes,
 		'catalog'  => $catalog,
 		'served'   => $served,
-		'areas'    => array_map( fn( $city ) => array( get_the_title( $city ), get_permalink( $city ) ), $cities ),
 		'services' => array_map( fn( $p ) => $p->ID, $pages ),
 	);
 	set_transient( 'mcl_schema', $site );
@@ -174,8 +140,7 @@ foreach ( array( 'added_post_meta', 'updated_post_meta', 'deleted_post_meta' ) a
 // The business is the site's Organization.
 add_filter( 'marccent_schema_organization', fn() => mcl_schema_site()['nodes'][0] );
 
-// Its locations and places on every page; a Service on a city page or a service page; the areas archive's list and
-// questions.
+// Its locations and places on every page; a Service on a city page or a service page.
 add_filter( 'marccent_schema_graph', function ( array $graph, array $c ) {
 	$b      = mcl_settings();
 	$site   = mcl_schema_site();
@@ -219,16 +184,6 @@ add_filter( 'marccent_schema_graph', function ( array $graph, array $c ) {
 			'url'         => $url,
 		);
 		$page['about'] = array( '@id' => $url . '#service' );
-	} elseif ( is_post_type_archive( 'city' ) ) {
-		$page['mainEntity'] = array(
-			'@type'           => 'ItemList',
-			'name'            => $b['areas']['plural'] . ' served',
-			'itemListElement' => array_map( fn( $area, $i ) => array( '@type' => 'ListItem', 'position' => $i + 1, 'name' => $area[0], 'url' => $area[1] ), $site['areas'], array_keys( $site['areas'] ) ),
-		);
-		$faq = mcl_faq_node( wp_json_encode( $b['archive']['faq'] ), $url );
-		if ( $faq ) {
-			$graph[ $faq['@id'] ] = $faq;
-		}
 	}
 	unset( $page );
 	return $graph;

@@ -1,7 +1,7 @@
 <?php
 /**
- * Opening hours (Settings → Business): the week's hours, the days that differ (holidays, a short day), and the
- * business's locations when it has several. Search reads them in the schema (openingHoursSpecification, its special
+ * Opening hours (Site content): the Business group's Monday…Sunday, the Closed days rows (holidays, a short day), and
+ * the Locations rows when the business has several. Search reads them in the schema (openingHoursSpecification, its special
  * days, a LocalBusiness per location) and llms.txt; pages show them with shortcodes:
  *
  *   [business_hours]      the week, today in bold, and the coming days that differ
@@ -240,20 +240,6 @@ add_shortcode( 'business_locations', function () {
 	}
 	return $out ? '<div class="mcl-locations grid cols-2">' . $out . '</div>' : '';
 } );
-
-/* Settings → Business: the week, then the days that differ */
-
-function mcl_hours_fields( array $s ): void {
-	echo '<h2>' . esc_html__( 'Opening hours', 'marccent-local' ) . '</h2>';
-	echo '<p>' . esc_html__( 'Each day’s hours, like 08:00-17:00, or two spans: 08:00-12:00, 13:00-17:00. Empty: closed. Search shows them, and so do [business_hours] and [open_now] on a page.', 'marccent-local' ) . '</p>';
-	echo '<table class="form-table" role="presentation">';
-	foreach ( MCL_DAYS as $key => $name ) {
-		printf( '<tr><th scope="row"><label for="mcl-hours-%1$s">%2$s</label></th><td><input id="mcl-hours-%1$s" name="%3$s[hours][%1$s]" value="%4$s" placeholder="%5$s" class="regular-text"></td></tr>', esc_attr( $key ), esc_html( wp_date( 'l', strtotime( "next $name 12:00" ) ) ), esc_attr( MCL_OPTION ), esc_attr( $s['hours'][ $key ] ?? '' ), esc_attr__( 'Closed', 'marccent-local' ) );
-	}
-	$lines = implode( "\n", array_map( fn( $c ) => trim( $c['date'] . ' ' . ( $c['hours'] ?: 'closed' ) . ' ' . $c['note'] ), $s['closures'] ) );
-	printf( '<tr><th scope="row"><label for="mcl-closures">%s</label></th><td><textarea id="mcl-closures" name="%s[closures]" rows="4" class="large-text code">%s</textarea><p class="description">%s</p></td></tr>', esc_html__( 'Days that differ', 'marccent-local' ), esc_attr( MCL_OPTION ), esc_textarea( $lines ), esc_html__( 'One per line: the date, closed or its hours, and a note. 2026-12-25 closed Christmas · 2026-12-24 09:00-12:00 Christmas Eve', 'marccent-local' ) );
-	echo '</table>';
-}
 
 add_action( 'wp_enqueue_scripts', function () {
 	wp_add_inline_style( 'marccent', '.mcl-hours{border-collapse:collapse}.mcl-hours th{text-align:left;font-weight:normal;padding:.2rem 1.5rem .2rem 0}.mcl-hours td{padding:.2rem 0}.mcl-hours .is-today{font-weight:bold}.mcl-open.is-open{color:var(--success,#15803d)}.mcl-open.is-closed{opacity:.8}.mcl-closures{margin:.25rem 0 0;padding-left:1.25rem}' );

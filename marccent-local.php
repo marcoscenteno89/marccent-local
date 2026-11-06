@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: Marccent Local
- * Description: A small local business on Marccent: its details (name, phone, location, opening hours, locations, services), a page for each city or area it serves with their archive, its JSON-LD (the business, its services and cities, each page's questions), the phone call bar and a map in the theme's colors. Tracking codes and cookie consent are the Marccent WP theme's. Titles, descriptions, sitemaps, redirects, IndexNow and llms.txt are Rank Math's. Set it up under Settings → Business.
- * Version: 0.3.0
+ * Description: A small local business on Marccent: reads its details (the site's Business, Services, Locations… field groups, under Site content) and its cities (the site's City posts) for its JSON-LD (the business, its services and the places it serves, its opening hours and locations), the hours shortcodes, the phone call bar and the map's default place. It makes no post types or field groups: those are the site's, in Fields. Tracking codes and cookie consent are the Marccent WP theme's; titles, descriptions, sitemaps, redirects, IndexNow and llms.txt are Rank Math's.
+ * Version: 0.5.0
  * Requires at least: 6.7
  * Requires PHP: 8.0
- * Requires Plugins: marccent-blocks
+ * Requires Plugins: marccent-blocks, marccent-content
  * Author: Marcos Centeno
  * License: GPL-2.0-or-later
  * Text Domain: marccent-local
@@ -21,15 +21,6 @@ require MCL_DIR . '/inc/schema.php';
 require MCL_DIR . '/inc/callbar.php';
 require MCL_DIR . '/inc/hours.php';
 
-// The plugin's options in one query if they aren't autoloaded or don't exist yet (a site that hasn't saved them), not
-// one each on every page.
-wp_prime_option_caches( array( MCL_OPTION ) );
-
-register_activation_hook( __FILE__, function () {
-	mcl_register_areas();
-	flush_rewrite_rules( false );
-} );
-
 // The plugin's few styles (breadcrumbs, chips, tables): inline after the theme's, too small for a request of their own.
 add_action( 'enqueue_block_assets', function () {
 	wp_add_inline_style( 'marccent', (string) file_get_contents( MCL_DIR . '/assets/site.css' ) );
@@ -39,7 +30,7 @@ add_action( 'enqueue_block_assets', function () {
 // Google Maps link, and Google's embed of it for a site without a key.
 add_filter( 'marccent_blocks_map', function ( array $map ) {
 	$b     = mcl_settings();
-	$where = trim( $b['name'] . ', ' . $b['city'] . ( $b['region'] ? ', ' . $b['region'] : '' ), ', ' );
+	$where = implode( ', ', array_filter( array( $b['name'], $b['street'], $b['city'], trim( $b['region'] . ' ' . $b['postal'] ) ) ) );
 	return $map + array_filter( array(
 		'lat'   => $b['lat'],
 		'lng'   => $b['lng'],

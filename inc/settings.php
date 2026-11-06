@@ -1,57 +1,89 @@
 <?php
 /**
- * The business, once (the marccent_local option): name, phone, location (NAP), profiles, its services and the regions
- * its areas are grouped in, the areas' names and URL, and the words of the areas archive. Schema, the
- * directory and the map all read it, so every mention of the business agrees. Settings → Business edits it; a site's
- * content import can write it whole.
+ * The business, once: the site's own field groups (Fields → Field groups, edited under Site content), which this plugin
+ * reads by name and never makes: Business (its details and Monday…Sunday hours; {{ business.phone }} in any block) and
+ * a group's rows for every list, Other names (business_names), Profiles, Specialties, Services, Closed days
+ * (closures), Locations, Regions and the Call bar. A site without a group gets its defaults. Schema, the hours and the
+ * map read them all through mcl_settings(), so every mention of the business agrees. A new site gets the groups by
+ * starting from another site's spec (types.json, or Tools → Marccent export).
  */
 
 defined( 'ABSPATH' ) || exit;
 
-const MCL_OPTION = 'marccent_local';
+const MCL_DAY_FIELDS = array( 'mo' => 'monday', 'tu' => 'tuesday', 'we' => 'wednesday', 'th' => 'thursday', 'fr' => 'friday', 'sa' => 'saturday', 'su' => 'sunday' );
 
-function mcl_defaults(): array {
-	return array(
-		'name'            => get_bloginfo( 'name' ),
-		'alternate'       => array(),          // other names people use
-		'type'            => 'LocalBusiness', // its schema.org type: GeneralContractor, Plumber, HVACBusiness…
-		'telephone'       => '',               // +1-555-555-0100
-		'phone'           => '',               // (555) 555-0100, as shown
-		'email'           => '',
-		'city'            => '',               // no street address: the business is listed by city
-		'region'          => '',               // IL
-		'country'         => 'US',
-		'lat'             => '',
-		'lng'             => '',
-		'map'             => '',               // a Google Maps link to the business
-		'same_as'         => array(),          // its profiles (Facebook, Instagram…)
-		'summary'         => get_bloginfo( 'description' ),
-		'service_area'    => '',               // one line: where it works
-		'profession'      => 'Local business', // what it is, in a phrase: Plumber
-		'services_label'  => 'services',       // its services as a group: plumbing services
-		'knows_about'     => array(),
-		'services_parent' => 'services',       // the page the service pages are children of
-		'services'        => array(),          // [ { slug, name, type, covers } ]
-		'regions'         => array(),          // [ { key, name, blurb } ]: the areas' groups, in order
-		'areas'           => array( 'singular' => 'City', 'plural' => 'Cities', 'label' => 'Service Areas', 'slug' => 'service-areas' ),
-		'archive'         => array( 'title' => '', 'description' => '', 'h1' => 'Service Areas', 'lead' => '', 'card_button' => 'More about %s', 'faq_heading' => 'Questions', 'faq' => array(), 'cta_heading' => '', 'cta_text' => '', 'quote_href' => '#form' ),
-		'hours'           => array_fill_keys( array( 'mo', 'tu', 'we', 'th', 'fr', 'sa', 'su' ), '' ), // 08:00-17:00 (or 08:00-12:00, 13:00-17:00); empty: closed
-		'closures'        => array(),          // [ { date: 2026-12-25, hours: '' (closed) or 09:00-12:00, note } ]: holidays and other exceptions
-		'locations'       => array(),          // [ { slug, name, street, city, region, postal, telephone, phone, lat, lng, map, hours } ]: its offices or shops, each listed on its own
-	);
+function mcl_group( string $name ): array {
+	return function_exists( 'mcc_group_value' ) ? mcc_group_value( $name ) : array();
 }
 
+// A day's hours from a group's monday…sunday: [ mo => '08:00-17:00', … ].
+function mcl_group_hours( array $values ): array {
+	$hours = array();
+	foreach ( MCL_DAY_FIELDS as $key => $day ) {
+		$hours[ $key ] = (string) ( $values[ $day ] ?? '' );
+	}
+	return mcl_hours_sanitize( $hours );
+}
+
+// A coordinate: a number field left empty is 0, which is no place.
+function mcl_coordinate( $value ): string {
+	return is_numeric( $value ) && 0.0 !== (float) $value ? (string) $value : '';
+}
+
+/**
+ * Everything the plugin reads about the business, from the groups, in one shape (with defaults for what's empty):
+ * name, alternate, type, telephone, phone, email, street, city, region, postal, country, lat, lng, map, same_as, summary, service_area,
+ * profession, services_label, knows_about, services_parent, services, regions, hours, closures, locations.
+ */
 function mcl_settings(): array {
 	static $cache = null;
-	if ( null === $cache ) {
-		$saved = get_option( MCL_OPTION, array() );
-		$saved = is_array( $saved ) ? $saved : array();
-		$d     = mcl_defaults();
-		$cache = array_merge( $d, $saved );
-		foreach ( array( 'areas', 'archive' ) as $group ) {
-			$cache[ $group ] = array_merge( $d[ $group ], (array) ( $saved[ $group ] ?? array() ) );
-		}
+	if ( null !== $cache ) {
+		return $cache;
 	}
+	$b       = mcl_group( 'business' );
+	$text    = fn( $value, $default = '' ) => '' !== trim( (string) $value ) ? trim( (string) $value ) : $default;
+	$column  = fn( $group, $field ) => array_values( array_filter( array_map( 'trim', array_column( mcl_group( $group ), $field ) ) ) );
+	$cache   = array(
+		'name'            => $text( $b['name'] ?? '', get_bloginfo( 'name' ) ),
+		'alternate'       => $column( 'business_names', 'name' ),
+		'type'            => $text( $b['schema_type'] ?? '', 'LocalBusiness' ),
+		'telephone'       => $text( $b['telephone'] ?? '' ),
+		'phone'           => $text( $b['phone'] ?? '' ),
+		'email'           => $text( $b['email'] ?? '' ),
+		'street'          => $text( $b['street'] ?? '' ),
+		'city'            => $text( $b['city'] ?? '' ),
+		'region'          => $text( $b['state'] ?? '' ),
+		'postal'          => $text( $b['postal_code'] ?? '' ),
+		'country'         => $text( $b['country'] ?? '', 'US' ),
+		'lat'             => mcl_coordinate( $b['latitude'] ?? '' ),
+		'lng'             => mcl_coordinate( $b['longitude'] ?? '' ),
+		'map'             => $text( $b['map_link'] ?? '' ),
+		'same_as'         => $column( 'profiles', 'link' ),
+		'summary'         => $text( $b['summary'] ?? '', get_bloginfo( 'description' ) ),
+		'service_area'    => $text( $b['service_area'] ?? '' ),
+		'profession'      => $text( $b['profession'] ?? '', 'Local business' ),
+		'services_label'  => $text( $b['services_label'] ?? '', 'services' ),
+		'knows_about'     => $column( 'specialties', 'specialty' ),
+		'services_parent' => $text( $b['services_page'] ?? '', 'services' ),
+		'services'        => array_values( array_filter( mcl_group( 'services' ), fn( $s ) => '' !== ( $s['slug'] ?? '' ) ) ),
+		'regions'         => mcl_group( 'regions' ),
+		'hours'           => mcl_group_hours( $b ),
+		'closures'        => mcl_closures_sanitize( mcl_group( 'closures' ) ),
+		'locations'       => array_map( fn( $l ) => array(
+			'slug'      => $l['slug'] ?? '',
+			'name'      => $l['name'] ?? '',
+			'street'    => $l['street'] ?? '',
+			'city'      => $l['city'] ?? '',
+			'region'    => $l['state'] ?? '',
+			'postal'    => $l['postal_code'] ?? '',
+			'telephone' => $l['telephone'] ?? '',
+			'phone'     => $l['phone'] ?? '',
+			'lat'       => mcl_coordinate( $l['latitude'] ?? '' ),
+			'lng'       => mcl_coordinate( $l['longitude'] ?? '' ),
+			'map'       => $l['map_link'] ?? '',
+			'hours'     => mcl_group_hours( $l ),
+		), mcl_group( 'locations' ) ),
+	);
 	return $cache;
 }
 
@@ -86,128 +118,82 @@ function mcl_service( string $slug ): ?array {
 	return null;
 }
 
-/*
- * Settings → Business. Plain fields for the details; the lists (services, regions, the archive's words) as JSON, with
- * an example each, since their shape is fixed and few people will edit them by hand.
+/**
+ * The business as older versions kept it (Settings → Business's marccent_local option, the mcl_callbar option), as
+ * the groups' values: [ group => value ], for the one-time move below. The areas archive's words went with the
+ * archive (the Service Areas page has them now), so they aren't kept.
  */
-add_action( 'admin_menu', function () {
-	add_options_page( __( 'Business', 'marccent-local' ), __( 'Business', 'marccent-local' ), 'manage_options', 'marccent-local', 'mcl_settings_page' );
-} );
-
-add_action( 'admin_init', function () {
-	register_setting( 'marccent-local', MCL_OPTION, array( 'type' => 'array', 'sanitize_callback' => 'mcl_sanitize' ) );
-} );
-
-const MCL_LINES = array( 'alternate', 'same_as', 'knows_about' );
-const MCL_JSON  = array( 'services', 'regions', 'areas', 'archive', 'locations' );
-
-function mcl_sanitize( $input ): array {
-	$old = mcl_settings();
-	$out = array();
-	foreach ( mcl_defaults() as $key => $default ) {
-		$value = $input[ $key ] ?? $old[ $key ];
-		if ( in_array( $key, MCL_LINES, true ) ) {
-			$out[ $key ] = is_array( $value ) ? $value : array_values( array_filter( array_map( 'trim', preg_split( '/\R/', (string) $value ) ) ) );
-		} elseif ( in_array( $key, MCL_JSON, true ) ) {
-			$decoded = is_array( $value ) ? $value : json_decode( wp_unslash( (string) $value ), true );
-			if ( ! is_array( $decoded ) ) {
-				/* translators: %s: a setting's name (Services, Regions…) */
-				add_settings_error( MCL_OPTION, $key, sprintf( __( '%s is not valid JSON; the previous value was kept.', 'marccent-local' ), ucfirst( $key ) ) );
-				$decoded = $old[ $key ];
-			}
-			$out[ $key ] = $decoded;
-		} elseif ( 'hours' === $key ) {
-			$out[ $key ] = mcl_hours_sanitize( (array) $value );
-		} elseif ( 'closures' === $key ) {
-			$out[ $key ] = is_array( $value ) ? mcl_closures_sanitize( $value ) : mcl_closures_parse( wp_unslash( (string) $value ) );
-		} elseif ( in_array( $key, array( 'map' ), true ) ) {
-			$out[ $key ] = esc_url_raw( (string) $value );
-		} elseif ( 'summary' === $key ) {
-			$out[ $key ] = sanitize_textarea_field( (string) $value );
-		} else {
-			$out[ $key ] = sanitize_text_field( trim( (string) $value, " \t\n\r\0\x0B\"'" ) );
-		}
+function mcl_groups_from_settings( array $old, array $callbar = array() ): array {
+	$rows  = fn( $list, $field ) => array_map( fn( $value ) => array( $field => $value ), array_values( array_filter( (array) $list ) ) );
+	$days  = fn( $hours ) => array_combine( array_values( MCL_DAY_FIELDS ), array_map( fn( $key ) => (string) ( ( (array) $hours )[ $key ] ?? '' ), array_keys( MCL_DAY_FIELDS ) ) );
+	$out   = array(
+		'business'               => array(
+			'name'           => $old['name'] ?? '',
+			'schema_type'    => $old['type'] ?? '',
+			'profession'     => $old['profession'] ?? '',
+			'services_label' => $old['services_label'] ?? '',
+			'summary'        => $old['summary'] ?? '',
+			'telephone'      => $old['telephone'] ?? '',
+			'phone'          => $old['phone'] ?? '',
+			'email'          => $old['email'] ?? '',
+			'street'         => $old['street'] ?? '',
+			'city'           => $old['city'] ?? '',
+			'state'          => $old['region'] ?? '',
+			'postal_code'    => $old['postal'] ?? '',
+			'country'        => $old['country'] ?? '',
+			'latitude'       => $old['lat'] ?? '',
+			'longitude'      => $old['lng'] ?? '',
+			'map_link'       => $old['map'] ?? '',
+			'service_area'   => $old['service_area'] ?? '',
+			'services_page'  => $old['services_parent'] ?? '',
+		) + $days( $old['hours'] ?? array() ),
+		'business_names'         => $rows( $old['alternate'] ?? array(), 'name' ),
+		'profiles'               => $rows( $old['same_as'] ?? array(), 'link' ),
+		'specialties'            => $rows( $old['knows_about'] ?? array(), 'specialty' ),
+		'services'               => array_values( (array) ( $old['services'] ?? array() ) ),
+		'closures'               => array_values( (array) ( $old['closures'] ?? array() ) ),
+		'locations'              => array_map( fn( $l ) => array(
+			'slug'        => $l['slug'] ?? '',
+			'name'        => $l['name'] ?? '',
+			'street'      => $l['street'] ?? '',
+			'city'        => $l['city'] ?? '',
+			'state'       => $l['region'] ?? '',
+			'postal_code' => $l['postal'] ?? '',
+			'telephone'   => $l['telephone'] ?? '',
+			'phone'       => $l['phone'] ?? '',
+			'latitude'    => $l['lat'] ?? '',
+			'longitude'   => $l['lng'] ?? '',
+			'map_link'    => $l['map'] ?? '',
+		) + $days( $l['hours'] ?? array() ), array_values( array_filter( (array) ( $old['locations'] ?? array() ), 'is_array' ) ) ),
+	);
+	if ( ! empty( $old['regions'] ) ) {
+		$out['regions'] = array_values( (array) $old['regions'] );
 	}
-	if ( ( $out['areas']['slug'] ?? '' ) !== $old['areas']['slug'] ) {
-		update_option( 'mcl_flush_rewrites', 1, true );
+	if ( $callbar ) {
+		$out['call_bar'] = array(
+			'show'        => ! empty( $callbar['on'] ),
+			'call_label'  => $callbar['call'] ?? '',
+			'quote_label' => $callbar['quote'] ?? '',
+			'quote_link'  => $callbar['href'] ?? '',
+		);
 	}
 	return $out;
 }
 
-// A changed areas URL takes effect once the rewrite rules are rebuilt, on the next load. The flag is autoloaded, so
-// looking for it among the autoloaded options costs no query (get_option would ask the database every time it's unset).
+// Once: Settings → Business's option (and the call bar's) into the groups, then gone; the regions only when the site
+// has no Regions rows yet. First thing on init; a Maps key Marccent Blocks hasn't taken yet (init, 10) stays for it.
 add_action( 'init', function () {
-	if ( ! empty( wp_load_alloptions()['mcl_flush_rewrites'] ) ) {
-		delete_option( 'mcl_flush_rewrites' );
-		flush_rewrite_rules( false );
+	$old = get_option( 'marccent_local', null );
+	// Only once the site has the Business group to put it in (Fields → Field groups).
+	if ( ! is_array( $old ) || array( 'maps_key' ) === array_keys( $old ) || ! function_exists( 'mcc_site_groups' ) || ! isset( mcc_site_groups()['business'] ) ) {
+		return;
 	}
-}, 99 );
-
-function mcl_settings_page(): void {
-	$s     = mcl_settings();
-	$field = function ( $key, $label, $help = '' ) use ( $s ) {
-		$name = MCL_OPTION . "[$key]";
-		echo '<tr><th scope="row"><label for="mcl-' . esc_attr( $key ) . '">' . esc_html( $label ) . '</label></th><td>';
-		if ( in_array( $key, MCL_LINES, true ) ) {
-			printf( '<textarea id="mcl-%s" name="%s" rows="3" class="large-text">%s</textarea>', esc_attr( $key ), esc_attr( $name ), esc_textarea( implode( "\n", $s[ $key ] ) ) );
-		} elseif ( in_array( $key, MCL_JSON, true ) ) {
-			printf( '<textarea id="mcl-%s" name="%s" rows="8" class="large-text code">%s</textarea>', esc_attr( $key ), esc_attr( $name ), esc_textarea( wp_json_encode( $s[ $key ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ) );
-		} elseif ( 'summary' === $key ) {
-			printf( '<textarea id="mcl-%s" name="%s" rows="3" class="large-text">%s</textarea>', esc_attr( $key ), esc_attr( $name ), esc_textarea( $s[ $key ] ) );
-		} else {
-			printf( '<input id="mcl-%s" name="%s" value="%s" class="regular-text">', esc_attr( $key ), esc_attr( $name ), esc_attr( (string) $s[ $key ] ) );
-		}
-		if ( $help ) {
-			echo '<p class="description">' . wp_kses_post( $help ) . '</p>';
-		}
-		echo '</td></tr>';
-	};
-	echo '<div class="wrap"><h1>' . esc_html__( 'Business', 'marccent-local' ) . '</h1><form method="post" action="options.php">';
-	settings_fields( 'marccent-local' );
-	echo '<h2>' . esc_html__( 'Details', 'marccent-local' ) . '</h2><table class="form-table" role="presentation">';
-	$field( 'name', __( 'Name', 'marccent-local' ) );
-	$field( 'alternate', __( 'Other names', 'marccent-local' ), __( 'One per line.', 'marccent-local' ) );
-	$field( 'type', __( 'Kind of business', 'marccent-local' ), __( 'Its <a href="https://schema.org/LocalBusiness" target="_blank" rel="noopener">schema.org type</a>: GeneralContractor, Plumber, HVACBusiness, LocalBusiness…', 'marccent-local' ) );
-	$field( 'summary', __( 'Summary', 'marccent-local' ), __( 'Two or three sentences: what it does and where. Search and AI answers quote it.', 'marccent-local' ) );
-	$field( 'telephone', __( 'Phone (for links)', 'marccent-local' ), __( '+1-555-555-0100', 'marccent-local' ) );
-	$field( 'phone', __( 'Phone (as shown)', 'marccent-local' ), __( '(555) 555-0100', 'marccent-local' ) );
-	$field( 'email', __( 'Email', 'marccent-local' ) );
-	$field( 'city', __( 'City', 'marccent-local' ), __( 'No street address: the business is listed by city.', 'marccent-local' ) );
-	$field( 'region', __( 'State', 'marccent-local' ), __( 'Two letters: ID', 'marccent-local' ) );
-	$field( 'country', __( 'Country', 'marccent-local' ), __( 'Two letters: US', 'marccent-local' ) );
-	$field( 'lat', __( 'Latitude', 'marccent-local' ), __( 'Where the map centers.', 'marccent-local' ) );
-	$field( 'lng', __( 'Longitude', 'marccent-local' ) );
-	$field( 'map', __( 'Google Maps link', 'marccent-local' ) );
-	$field( 'same_as', __( 'Profiles', 'marccent-local' ), __( 'Facebook, Instagram… one link per line.', 'marccent-local' ) );
-	$field( 'profession', __( 'What it is', 'marccent-local' ), __( 'In a phrase: Plumber. Used as "Plumber in Springfield, IL".', 'marccent-local' ) );
-	$field( 'services_label', __( 'Its services, together', 'marccent-local' ), __( 'plumbing services', 'marccent-local' ) );
-	$field( 'service_area', __( 'Service area', 'marccent-local' ), __( 'One line: Springfield and the towns around it in central Illinois', 'marccent-local' ) );
-	$field( 'knows_about', __( 'Specialties', 'marccent-local' ), __( 'One per line.', 'marccent-local' ) );
-	echo '</table>';
-	mcl_hours_fields( $s );
-	echo '<h2>' . esc_html__( 'Locations', 'marccent-local' ) . '</h2><table class="form-table" role="presentation">';
-	$field( 'locations', __( 'Offices or shops', 'marccent-local' ), __( 'JSON, only when the business has more than one place customers visit; each is listed on its own in search: <code>[{"slug": "downtown", "name": "Downtown", "street": "12 Main St", "city": "Boise", "region": "ID", "postal": "83702", "telephone": "+1-208-555-0100", "phone": "(208) 555-0100", "lat": 43.61, "lng": -116.2, "map": "https://maps.google.com/…", "hours": {"mo": "08:00-17:00"}}]</code>. Its hours: the business\'s when left out. Show them with <code>[business_locations]</code>.', 'marccent-local' ) );
-	echo '</table>';
-	echo '<h2>' . esc_html__( 'Services and areas', 'marccent-local' ) . '</h2><table class="form-table" role="presentation">';
-	$field( 'services_parent', __( 'Services page', 'marccent-local' ), __( 'The slug of the page the service pages sit under.', 'marccent-local' ) );
-	$field( 'services', __( 'Services', 'marccent-local' ), __( 'JSON: <code>[{"slug": "drains", "name": "Drain Cleaning", "type": "Drain cleaning", "covers": "kitchen, bath and main lines…"}]</code>', 'marccent-local' ) );
-	$field( 'regions', __( 'Regions', 'marccent-local' ), __( 'JSON, the groups the areas are listed in: <code>[{"key": "central-illinois", "name": "Central Illinois", "blurb": "…"}]</code>', 'marccent-local' ) );
-	$field( 'areas', __( 'Areas', 'marccent-local' ), __( 'JSON: what an area is called and the archive\'s URL: <code>{"singular": "City", "plural": "Cities", "label": "Service Areas", "slug": "service-areas"}</code>', 'marccent-local' ) );
-	$field( 'archive', __( 'Areas archive', 'marccent-local' ), __( 'JSON, the archive page\'s words: <code>{"title", "description", "h1", "lead", "card_button": "More about %s", "faq_heading", "faq": [{"question", "answer"}], "cta_heading", "cta_text", "quote_href"}</code>', 'marccent-local' ) );
-	echo '</table>';
-	mcl_callbar_fields();
-	submit_button();
-	echo '</form></div>';
-}
-
-// Tools → Marccent export: the business. (Its Maps key is Marccent Blocks', Appearance → Marccent settings.)
-add_filter( 'marccent_export_parts', function ( $parts ) {
-	$parts['business'] = array(
-		'label'  => __( 'Business details (Settings → Business)', 'marccent-local' ),
-		'export' => fn() => mcl_settings(),
-		'import' => function ( array $data ) {
-			update_option( MCL_OPTION, mcl_sanitize( $data ) );
-		},
-	);
-	return $parts;
-} );
+	$values = mcl_groups_from_settings( $old, (array) get_option( 'mcl_callbar', array() ) );
+	if ( mcl_group( 'regions' ) ) {
+		unset( $values['regions'] );
+	}
+	mcc_save_site_values( $values, false );
+	empty( $old['maps_key'] ) ? delete_option( 'marccent_local' ) : update_option( 'marccent_local', array( 'maps_key' => $old['maps_key'] ) );
+	delete_option( 'mcl_callbar' );
+	delete_transient( 'mcl_schema' );
+}, 1 );
